@@ -37,7 +37,10 @@ def validate_medication(med):
             except (TypeError, ValueError) as err:
                 raise PillManagerError("Stock quantity must be numeric") from err
             # Negative balances are retained as warnings, never usable stock.
-            if not product.get("splittable", False) and not quantity.is_integer():
+            if product.get("splittable", False):
+                if abs(quantity * 2 - round(quantity * 2)) > 1e-7:
+                    raise PillManagerError("Splittable stock quantities must use 0.5 tablet increments")
+            elif not quantity.is_integer():
                 raise PillManagerError("Non-splittable product stock must be whole tablets")
             if batch.get("expires_on"):
                 try:
