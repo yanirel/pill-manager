@@ -149,7 +149,10 @@ async def async_setup_services(hass: HomeAssistant):
         quantity = float(call.data["quantity"])
         if quantity <= 0:
             raise HomeAssistantError("Stock quantity must be positive")
-        if not product.get("splittable", False) and not quantity.is_integer():
+        if product.get("splittable", False):
+            if abs(quantity * 2 - round(quantity * 2)) > 1e-7:
+                raise HomeAssistantError("Splittable stock must use 0.5 tablet increments")
+        elif not quantity.is_integer():
             raise HomeAssistantError("Non-splittable stock must be a whole number")
         if call.data.get("expires_on"):
             try:
@@ -180,7 +183,10 @@ async def async_setup_services(hass: HomeAssistant):
         if batch is None:
             raise HomeAssistantError("Stock batch not found")
         new_quantity = float(call.data["quantity"])
-        if not product.get("splittable", False) and not new_quantity.is_integer():
+        if product.get("splittable", False):
+            if abs(new_quantity * 2 - round(new_quantity * 2)) > 1e-7:
+                raise HomeAssistantError("Splittable stock must use 0.5 tablet increments")
+        elif not new_quantity.is_integer():
             raise HomeAssistantError("Non-splittable stock must be a whole number")
         before = float(batch.get("quantity", 0))
         batch["quantity"] = new_quantity
