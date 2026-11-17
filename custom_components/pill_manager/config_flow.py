@@ -43,6 +43,20 @@ class PillManagerOptionsFlow(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         current = {**DEFAULT_OPTIONS, **self.config_entry.options}
+
+        # Home Assistant exposes notify targets as services in the notify domain.
+        # Use the live service registry so users can select a Companion App target
+        # without typing a service name or creating a separate automation.
+        notify_services = self.hass.services.async_services().get("notify", {})
+        notify_options = [""] + [
+            f"notify.{service_name}" for service_name in sorted(notify_services)
+        ]
+        selected_service = current.get("notify_service", "")
+        if selected_service and selected_service not in notify_options:
+            # Keep a previously configured target visible if the mobile app is
+            # temporarily unavailable during an options-flow edit.
+            notify_options.append(selected_service)
+
         schema = vol.Schema({
             vol.Required("reminder_repeat_minutes",
                          default=current["reminder_repeat_minutes"]): vol.All(
@@ -54,6 +68,7 @@ class PillManagerOptionsFlow(config_entries.OptionsFlow):
                          default=current["missed_dose_action"]): vol.In(["ask", "mark_missed"]),
             vol.Required("auto_deduct_stock",
                          default=current["auto_deduct_stock"]): bool,
-            vol.Optional("notify_service", default=current["notify_service"]): str,
+            vol.Required("notify_service",
+                         default=selected_service): vol.In(notify_options),
         })
         return self.async_show_form(step_id="init", data_schema=schema)
