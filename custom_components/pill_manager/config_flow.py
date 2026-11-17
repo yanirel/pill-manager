@@ -38,9 +38,6 @@ class PillManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class PillManagerOptionsFlow(config_entries.OptionsFlow):
     """Configure reminder and inventory behavior."""
 
-    def __init__(self, config_entry):
-        self.config_entry = config_entry
-
     async def async_step_init(self, user_input=None) -> FlowResult:
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
