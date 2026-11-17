@@ -25,12 +25,32 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
         "missed_after_minutes": 120,
         "missed_dose_action": "ask",
         "auto_deduct_stock": False,
+        "notify_entity": "",
         "notify_service": "",
         **entry.options,
     }
+    notify_entity = str(options.get("notify_entity", "")).strip()
     notify_target = str(options.get("notify_service", "")).strip()
 
     async def send_notification(occurrence, overdue=False):
+        title = "מנה שהגיע הזמן לקחת" if not overdue else "מנה שלא אושרה"
+        message = (
+            f"{occurrence['medication_name']} · {occurrence['dose_mg']:g} מ״ג"
+            if not overdue else
+            f"המנה של {occurrence['medication_name']} ({occurrence['dose_mg']:g} מ״ג) עברה את חלון האישור."
+        )
+        if notify_entity:
+            if not hass.states.get(notify_entity) or not hass.services.has_service("notify", "send_message"):
+                return False
+            # Native notify entities use notify.send_message. This API accepts
+            # title/message only; actionable Companion App buttons require the
+            # legacy mobile_app notify service below.
+            await hass.services.async_call("notify", "send_message", {
+                "entity_id": notify_entity,
+                "title": title,
+                "message": message,
+            }, blocking=True)
+            return True
         if not notify_target.startswith("notify.") or notify_target.count(".") != 1:
             return False
         service = notify_target.split(".", 1)[1]
@@ -38,12 +58,8 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
             return False
         occurrence_id = occurrence["occurrence_id"]
         await hass.services.async_call("notify", service, {
-            "title": "מנה שהגיע הזמן לקחת" if not overdue else "מנה שלא אושרה",
-            "message": (
-                f"{occurrence['medication_name']} · {occurrence['dose_mg']:g} מ״ג"
-                if not overdue else
-                f"המנה של {occurrence['medication_name']} ({occurrence['dose_mg']:g} מ״ג) עברה את חלון האישור."
-            ),
+            "title": title,
+            "message": message,
             "data": {
                 "tag": f"pill_{occurrence_id}",
                 "actions": [
