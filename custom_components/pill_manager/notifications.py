@@ -48,6 +48,7 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
                 "tag": f"pill_{occurrence_id}",
                 "actions": [
                     {"action": f"PILL_TAKEN|{occurrence_id}", "title": "לקחתי"},
+                    {"action": f"PILL_SNOOZE|{occurrence_id}", "title": "דחה"},
                     {"action": f"PILL_SKIP|{occurrence_id}", "title": "דלג"},
                 ],
             },
@@ -130,7 +131,10 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
                 mark = next((x for x in store.data.setdefault("reminder_marks", [])
                              if x.get("occurrence_id") == occurrence_id), None)
                 last_sent = _parse(mark.get("last_sent")) if mark else None
+                snooze_until = _parse(mark.get("snooze_until")) if mark else None
                 repeat = int(options["reminder_repeat_minutes"])
+                if snooze_until and now < snooze_until:
+                    continue
                 if last_sent and now - last_sent < timedelta(minutes=repeat):
                     continue
                 try:
@@ -174,6 +178,15 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
                 "occurrence_id": occurrence_id,
                 "updated_at": now,
             }))
+        elif command == "PILL_SNOOZE":
+            mark = next((x for x in store.data.get("reminder_marks", [])
+                         if x.get("occurrence_id") == occurrence_id), None)
+            if mark:
+                mark["snooze_until"] = (dt_util.now() + timedelta(
+                    minutes=int(options["reminder_repeat_minutes"])
+                )).isoformat()
+                hass.async_create_task(store.async_save())
+                hass.bus.async_fire(EVENT_V2_UPDATED)
 
     action_unsub = hass.bus.async_listen("mobile_app_notification_action", handle_mobile_action)
     interval_unsub = async_track_time_interval(hass, check_reminders, timedelta(minutes=1))
