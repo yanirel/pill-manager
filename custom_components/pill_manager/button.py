@@ -33,8 +33,16 @@ class PillManagerTakenButton(ButtonEntity):
             return
         date_key = now.date().isoformat()
         clock = now.strftime("%H:%M")
-        due_times = [value for value in phase.get("times", []) if value <= clock]
-        due_time = sorted(due_times)[-1] if due_times else None
+        due_time = None
+        for value in sorted((t for t in phase.get("times", []) if t <= clock), reverse=True):
+            candidate = f"{self.medication_id}:{date_key}:{value}"
+            taken = any(x.get("occurrence_id") == candidate and x.get("status") == "taken"
+                        for x in self.store.data.get("intake", []))
+            handled = any(x.get("occurrence_id") == candidate and x.get("status") in ("skipped", "missed")
+                          for x in self.store.data.get("occurrences", []))
+            if not taken and not handled:
+                due_time = value
+                break
         occurrence_id = (
             f"{self.medication_id}:{date_key}:{due_time}" if due_time
             else f"button:{self.medication_id}:{now.strftime('%Y%m%d%H%M')}"
