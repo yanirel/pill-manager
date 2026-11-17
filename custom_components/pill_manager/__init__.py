@@ -74,7 +74,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload an instance."""
     from homeassistant.components import frontend
 
-    await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unloaded:
+        return False
     for unsub in hass.data.get(f"{DOMAIN}_unsubscribers", {}).pop(entry.entry_id, []):
         unsub()
     frontend.async_remove_panel(hass, "pill-manager")
