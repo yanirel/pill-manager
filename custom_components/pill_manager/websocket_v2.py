@@ -28,9 +28,8 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
     async def get_data(hass, connection, msg):
         store = _store(hass)
         data = store.snapshot()
-        today = hass.config.time_zone
         from homeassistant.util import dt as dt_util
-        current_date = dt_util.now(today).date()
+        current_date = dt_util.now().date()
         for medication in data["medications"]:
             try:
                 medication["forecast"] = forecast(
