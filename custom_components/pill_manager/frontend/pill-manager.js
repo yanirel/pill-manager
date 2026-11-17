@@ -59,14 +59,14 @@ class PillManagerPanel extends HTMLElement {
     if (this._editorOpen) { this._refreshPending = true; return; }
     const medications = this.data?.medications || [];
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthLength = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const monthStart = new Date(now.getFullYear(), now.getMonth()+(this._calendarOffset||0), 1);
+    const monthLength = new Date(monthStart.getFullYear(), monthStart.getMonth()+1, 0).getDate();
     const monthOffset = (monthStart.getDay()+6)%7; // Monday-first, matching Python weekday()
     const monthLabel = new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(monthStart);
     const calendarCells = Array.from({length:monthOffset},()=>'<div class="cal-empty"></div>');
     for(let day=1;day<=monthLength;day++){
-      const date=new Date(now.getFullYear(),now.getMonth(),day);
-      const dateKey=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+      const date=new Date(monthStart.getFullYear(),monthStart.getMonth(),day);
+      const dateKey=monthStart.getFullYear()+"-"+String(monthStart.getMonth()+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
       const weekday=(date.getDay()+6)%7;
       const planned=[];
       for(const med of medications){
@@ -138,7 +138,7 @@ class PillManagerPanel extends HTMLElement {
           </section>` : ""}
 
         <section class="card calendar-card">
-          <div class="line"><h2>לוח הטיפול · ${this.esc(monthLabel)}</h2><span class="muted">התוכנית המתוכננת לכל יום</span></div>
+          <div class="line"><h2>לוח הטיפול · ${this.esc(monthLabel)}</h2><div class="actions"><button class="secondary" id="cal-prev">‹ חודש קודם</button><button class="secondary" id="cal-next">חודש הבא ›</button></div></div>
           <div class="calendar">
             ${["ב׳","ג׳","ד׳","ה׳","ו׳","ש׳","א׳"].map(d=>'<div class="cal-head">'+d+'</div>').join("")}
             ${calendarCells.join("")}
@@ -168,6 +168,8 @@ class PillManagerPanel extends HTMLElement {
         <div id="editor"></div>
       </div>`;
     this.querySelector("#new").onclick=()=>this.editMedication();
+    this.querySelector("#cal-prev").onclick=()=>{this._calendarOffset=(this._calendarOffset||0)-1;this.render();};
+    this.querySelector("#cal-next").onclick=()=>{this._calendarOffset=(this._calendarOffset||0)+1;this.render();};
     this.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.edit)));
     this.querySelectorAll("[data-add-strength]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.addStrength),true));
     this.querySelectorAll("[data-take]").forEach(b=>b.onclick=()=>this.takeMedication(medications.find(m=>m.id===b.dataset.take)));
@@ -241,7 +243,7 @@ class PillManagerPanel extends HTMLElement {
           <label>תוכנית לפי תקופות — בחר לכל תקופה תאריך התחלה וסיום, מינון, שעות וימי נטילה. השארת תאריך הסיום ריק פירושה שהתקופה ממשיכה עד שתעדכן אותה.</label>
           <div id="phase-list">${phaseDefaults.map((p,i)=>this.phaseEditor(p,i)).join("")}</div>
           <div class="actions"><button class="secondary" id="add-phase">+ הוספת שלב</button><button class="secondary" id="remove-phase">הסרת השלב האחרון</button></div>
-          <div class="muted">השלבים חייבים להיות רצופים. משך שלב נמדד בימים, ושעות וימי נטילה מוגדרים לכל שלב בנפרד.</div>
+          <div class="muted">אפשר להגדיר תקופות נפרדות עם הפסקות ביניהן, אך לא תקופות חופפות. שעות וימי נטילה מוגדרים לכל תקופה בנפרד.</div>
         </div>
         <h2 class="section">מינונים ומלאי לפי אריזה</h2><div id="products">${med.products.map((p,i)=>this.productEditor(p,i,true)).join("")}</div>
         <div class="actions"><button class="secondary" id="add-product">+ הוספת אריזה / חוזק</button></div>
