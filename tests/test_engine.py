@@ -1,8 +1,16 @@
+import importlib.util
 import unittest
 from datetime import date
-from custom_components.pill_manager.engine import (
-    PillManagerError, active_phase, allocate_dose, consume_allocation, forecast,
-)
+from pathlib import Path
+
+ENGINE_PATH = Path(__file__).parents[1] / "custom_components" / "pill_manager" / "engine.py"
+SPEC = importlib.util.spec_from_file_location("pill_manager_engine", ENGINE_PATH)
+ENGINE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(ENGINE)
+PillManagerError = ENGINE.PillManagerError
+allocate_dose = ENGINE.allocate_dose
+consume_allocation = ENGINE.consume_allocation
+forecast = ENGINE.forecast
 
 def product(pid, strength, qty, received, split=False, batch="b"):
     return {"id":pid,"strength_mg":strength,"splittable":split,
@@ -13,7 +21,8 @@ class EngineTests(unittest.TestCase):
         products=[product("p25",25,4,"2026-01-01",True),
                   product("p50",50,4,"2026-01-02",True)]
         allocation=allocate_dose(products,75,date(2026,2,1))
-        self.assertEqual(sum(next(p["strength_mg"] for p in products if p["id"]==x["product_id"])*x["units"] for x in allocation),75)
+        actual=sum(next(p["strength_mg"] for p in products if p["id"]==x["product_id"])*x["units"] for x in allocation)
+        self.assertEqual(actual,75)
 
     def test_half_tablet_supported(self):
         products=[product("p25",25,1,"2026-01-01",True)]
