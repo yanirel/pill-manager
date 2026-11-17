@@ -43,10 +43,9 @@ class PillManagerTakenButton(ButtonEntity):
             if not taken and not handled:
                 due_time = value
                 break
-        occurrence_id = (
-            f"{self.medication_id}:{date_key}:{due_time}" if due_time
-            else f"button:{self.medication_id}:{now.strftime('%Y%m%d%H%M')}"
-        )
+        if not due_time:
+            return
+        occurrence_id = f"{self.medication_id}:{date_key}:{due_time}"
         await self.hass.services.async_call(DOMAIN, "take_dose", {
             "medication_id": self.medication_id,
             "intake_id": occurrence_id,
