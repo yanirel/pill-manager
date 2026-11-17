@@ -142,7 +142,10 @@ def allocate_dose(products: list[dict[str, Any]], target_mg: float,
         for total, (count, chosen) in sorted(list(dp.items()), reverse=True):
             new_total = total + step
             candidate = chosen + (idx,)
-            if new_total <= target and (new_total not in dp or candidate < dp[new_total][1]):
+            if new_total <= target and (
+                new_total not in dp
+                or (count + 1, candidate) < (dp[new_total][0], dp[new_total][1])
+            ):
                 dp[new_total] = (count + 1, candidate)
     if target not in dp:
         raise PillManagerError(f"Insufficient compatible stock for {target_mg:g} mg")
