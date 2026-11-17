@@ -36,7 +36,7 @@ class PillManagerPanel extends HTMLElement {
         label{display:block;font-size:13px;color:#65707c;margin-bottom:5px}
         input,select,textarea{width:100%;padding:10px;border:1px solid #dce1e6;border-radius:9px;font:inherit;background:white;color:#20242b}
         textarea{min-height:105px;direction:ltr;text-align:left;font-family:monospace}.wide{grid-column:1/-1}
-        .product{border:1px solid #edf0f2;border-radius:12px;padding:12px;margin:10px 0}
+        .product,.phase-editor{border:1px solid #edf0f2;border-radius:12px;padding:12px;margin:10px 0}
         .batch{font-size:13px;color:#66717d;margin-top:5px}.section{margin:24px 0 10px}
         @media(max-width:540px){.wrap{padding:17px 11px}.form{grid-template-columns:1fr}header{align-items:flex-start}}
       </style>
@@ -157,7 +157,7 @@ class PillManagerPanel extends HTMLElement {
   phaseEditor(phase,index) {
     const weekdays=phase.weekdays||[0,1,2,3,4,5,6];
     const days=["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"];
-    return `<div class="product phase-row" data-phase-index="${index}">
+    return `<div class="phase-row phase-editor" data-phase-index="${index}">
       <div class="form">
         <div><label>תאריך התחלה</label><input class="phase-start" type="date" value="${this.esc(phase.start_date||new Date().toISOString().slice(0,10))}"></div>
         <div><label>משך השלב בימים (ריק = ללא הגבלה)</label><input class="phase-duration" type="number" min="1" step="1" value="${phase.duration_days??""}" placeholder="ללא הגבלה"></div>
