@@ -73,6 +73,21 @@ class EngineTests(unittest.TestCase):
         self.assertIn("a:same", result["batch_depletion_dates"])
         self.assertIn("b:same", result["batch_depletion_dates"])
 
+    def test_backdated_intake_ignores_batches_received_later(self):
+        products = [product("future", 25, 2, "2026-11-18", True)]
+        with self.assertRaises(PillManagerError):
+            allocate_dose(products, 25, date(2026, 11, 17))
+
+    def test_negative_stock_is_not_allocatable(self):
+        products = [product("negative", 25, -1, "2026-01-01", True)]
+        with self.assertRaises(PillManagerError):
+            allocate_dose(products, 25, date(2026, 11, 17))
+
+    def test_scheduled_phase_requires_time(self):
+        regimen = {"mode": "fixed", "fixed_phase": {"dose_mg": 25, "times": []}}
+        with self.assertRaises(PillManagerError):
+            validate_regimen(regimen)
+
 
 if __name__ == "__main__":
     unittest.main()
