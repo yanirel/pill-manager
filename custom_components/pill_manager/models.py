@@ -9,6 +9,8 @@ def validate_medication(med):
 
     product_ids = set()
     batch_ids = set()
+    if not med.get("products"):
+        raise PillManagerError("At least one product strength is required")
     for product in med.get("products", []):
         product_id = product.get("id")
         if not product_id or product_id in product_ids:
@@ -34,19 +36,18 @@ def validate_medication(med):
                 quantity = float(batch.get("quantity", 0))
             except (TypeError, ValueError) as err:
                 raise PillManagerError("Stock quantity must be numeric") from err
-            if quantity < 0:
-                raise PillManagerError("Stock quantity cannot be negative")
+            # Negative balances are retained as warnings, never usable stock.
             if not product.get("splittable", False) and not quantity.is_integer():
                 raise PillManagerError("Non-splittable product stock must be whole tablets")
             if batch.get("expires_on"):
                 date.fromisoformat(batch["expires_on"])
-            if batch.get("received_at"):
-                # Accept either an ISO date or an ISO datetime.
-                value = str(batch["received_at"])
-                try:
-                    date.fromisoformat(value[:10])
-                except ValueError as err:
-                    raise PillManagerError("received_at must be an ISO date or datetime") from err
+            if not batch.get("received_at"):
+                raise PillManagerError("Every stock batch needs received_at")
+            value = str(batch["received_at"])
+            try:
+                date.fromisoformat(value[:10])
+            except ValueError as err:
+                raise PillManagerError("received_at must be an ISO date or datetime") from err
 
     validate_regimen(med.get("regimen", {}))
     return med
