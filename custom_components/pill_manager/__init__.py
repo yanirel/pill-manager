@@ -15,7 +15,7 @@ from .services import async_setup_services
 from .websocket import async_setup_websocket
 from .websocket_v2 import async_setup_v2_websocket
 
-PLATFORMS: list[str] = ["sensor"]
+PLATFORMS: list[str] = ["sensor", "binary_sensor"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
