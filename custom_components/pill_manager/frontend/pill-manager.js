@@ -152,11 +152,15 @@ class PillManagerPanel extends HTMLElement {
             return `<article class="card">
               <div class="line"><h2>${this.esc(m.name)}</h2><span class="tag">${m.regimen?.mode==="prn"?"לפי הצורך":m.regimen?.mode==="phased"?"משטר מדורג":"מינון קבוע"}</span></div>
               <div class="muted">סה״כ ${products.length} סוגי מוצר · ${units.toFixed(1)} יחידות במלאי</div>
-              ${products.map(p=>`<div class="stock"><div class="line"><strong>${this.esc(p.name||"מוצר")} · ${p.strength_mg} מ״ג</strong><span>${p.splittable?"ניתן לחצייה":"שלם בלבד"}</span></div>
-                ${(p.stock_batches||[]).map(b=>`<div class="batch ${Number(b.quantity)<0?"warn":""}">אצווה: ${this.esc(b.quantity)} יח׳ ${Number(b.quantity)<0?"· יתרת מלאי שלילית — נדרשת בדיקה":""} · התקבלה: ${this.esc(b.received_at||"—")} ${b.expires_on?"· תפוגה: "+this.esc(b.expires_on):""} <button class="secondary" data-adjust="${m.id}" data-product="${p.id}" data-batch="${b.id}" data-quantity="${b.quantity}">תיקון יתרה</button></div>`).join("")}
-                <div class="actions"><button class="secondary" data-stock="${m.id}" data-product="${p.id}">הוספת מלאי</button></div></div>`).join("")}
+              ${products.map(p=>{
+                const pUnits=(p.stock_batches||[]).reduce((sum,b)=>sum+Number(b.quantity||0),0);
+                return `<div class="stock"><div class="line"><strong>${this.esc(p.name||"אריזה")} · ${p.strength_mg} מ״ג</strong><span>${pUnits} טבליות במלאי</span></div>
+                  <div class="muted">${p.splittable?"ניתן לחצייה":"טבליות שלמות בלבד"}</div>
+                  ${(p.stock_batches||[]).map(b=>`<div class="batch ${Number(b.quantity)<0?"warn":""}">אצווה: ${this.esc(b.quantity)} יח׳ ${Number(b.quantity)<0?"· יתרת מלאי שלילית — נדרשת בדיקה":""} · התקבלה: ${this.esc(b.received_at||"—")} ${b.expires_on?"· תפוגה: "+this.esc(b.expires_on):""} <button class="secondary" data-adjust="${m.id}" data-product="${p.id}" data-batch="${b.id}" data-quantity="${b.quantity}">תיקון יתרה</button></div>`).join("")}
+                  <div class="actions"><button class="secondary" data-stock="${m.id}" data-product="${p.id}">הוספת מלאי לחוזק הזה</button></div></div>`;
+              }).join("")}
               <div class="stock"><div class="line"><span>תחזית אזילת מלאי</span><strong>${forecast.depletion_date?this.esc(forecast.depletion_date):forecast.reason==="prn"?"לא מחושבת (לפי הצורך)":forecast.error?"לא זמינה":"מעבר לטווח התחזית"}</strong></div></div>
-              <div class="actions"><button data-take="${m.id}">אישור נטילה</button><button class="secondary" data-edit="${m.id}">עריכה</button><button class="danger" data-delete="${m.id}">מחיקה</button></div>
+              <div class="actions"><button data-take="${m.id}">אישור נטילה</button><button class="secondary" data-add-strength="${m.id}">+ הוספת חוזק</button><button class="secondary" data-edit="${m.id}">עריכת תרופה</button><button class="danger" data-delete="${m.id}">מחיקה</button></div>
             </article>`;
           }).join("")}
         </div>
@@ -165,6 +169,7 @@ class PillManagerPanel extends HTMLElement {
       </div>`;
     this.querySelector("#new").onclick=()=>this.editMedication();
     this.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.edit)));
+    this.querySelectorAll("[data-add-strength]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.addStrength),true));
     this.querySelectorAll("[data-take]").forEach(b=>b.onclick=()=>this.takeMedication(medications.find(m=>m.id===b.dataset.take)));
     this.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>this.deleteMedication(b.dataset.delete));
     this.querySelectorAll("[data-stock]").forEach(b=>b.onclick=()=>this.addStock(b.dataset.stock,b.dataset.product));
@@ -211,7 +216,7 @@ class PillManagerPanel extends HTMLElement {
       await this.load(true);
     }catch(err){alert("לא ניתן לדלג על המנה: "+(err.message||err));}
   }
-  editMedication(existing) {
+  editMedication(existing, addStrength = false) {
     this._editorOpen = true;
     const med=existing?JSON.parse(JSON.stringify(existing)):{
       name:"",products:[{id:crypto.randomUUID(),name:"",strength_mg:25,splittable:true,stock_batches:[]}],
@@ -238,7 +243,7 @@ class PillManagerPanel extends HTMLElement {
           <div class="actions"><button class="secondary" id="add-phase">+ הוספת שלב</button><button class="secondary" id="remove-phase">הסרת השלב האחרון</button></div>
           <div class="muted">השלבים חייבים להיות רצופים. משך שלב נמדד בימים, ושעות וימי נטילה מוגדרים לכל שלב בנפרד.</div>
         </div>
-        <h2 class="section">מינונים ומלאי לפי אריזה</h2><div id="products">${med.products.map((p,i)=>this.productEditor(p,i)).join("")}</div>
+        <h2 class="section">מינונים ומלאי לפי אריזה</h2><div id="products">${med.products.map((p,i)=>this.productEditor(p,i,true)).join("")}</div>
         <div class="actions"><button class="secondary" id="add-product">+ הוספת אריזה / חוזק</button></div>
         <div class="actions"><button id="save">שמירה</button><button class="secondary" id="cancel">ביטול</button></div>
         <div id="form-error" class="muted"></div>
@@ -249,6 +254,7 @@ class PillManagerPanel extends HTMLElement {
     this.querySelector("#add-phase").onclick=()=>this.addPhase();
     this.querySelector("#remove-phase").onclick=()=>{const root=this.querySelector("#phase-list");if(root.children.length>1){root.lastElementChild.remove();root.lastElementChild.querySelector(".phase-end").value="";}else alert("נדרש לפחות שלב אחד.");};
     this.querySelector("#save").onclick=()=>this.saveMedication(med);
+    if(addStrength)this.querySelector("#add-product").click();
   }
   phaseEditor(phase,index) {
     const weekdays=phase.weekdays||[0,1,2,3,4,5,6];
@@ -297,13 +303,13 @@ class PillManagerPanel extends HTMLElement {
     last.querySelector(".phase-end").value=end;
     root.insertAdjacentHTML("beforeend",this.phaseEditor(phase,root.children.length));
   }
-  productEditor(product,index) {
+  productEditor(product,index,isExisting=false) {
     return `<div class="product" data-product-index="${index}" data-id="${this.esc(product.id||crypto.randomUUID())}">
       <div class="form"><div><label>שם האריזה (למשל: 30 טבליות)</label><input class="p-name" value="${this.esc(product.name||"")}" placeholder="למשל טבליות 25 מ״ג"></div>
       <div><label>חוזק של כל טבליה (מ״ג)</label><input class="p-strength" type="number" min="0.5" step="0.5" value="${product.strength_mg||25}"></div>
-      <div><label>כמה טבליות מהחוזק הזה יש במלאי?</label><input class="p-quantity" type="number" min="0" step="${product.splittable?0.5:1}" value="${(product.stock_batches||[]).reduce((s,b)=>s+Number(b.quantity||0),0)}"></div>
+      <div><label>${isExisting?"כמות קיימת (לשינוי השתמש בכפתור הוספת מלאי בכרטיס)":"כמות טבליות שיש לך"}</label><input class="p-quantity" type="number" min="0" step="${product.splittable?0.5:1}" value="${(product.stock_batches||[]).reduce((s,b)=>s+Number(b.quantity||0),0)}" ${isExisting?"readonly":""}></div>
       <div><label>אפשר לחצות?</label><select class="p-split"><option value="true" ${product.splittable?"selected":""}>כן, חצאים מותרים</option><option value="false" ${!product.splittable?"selected":""}>לא</option></select></div></div>
-      <div class="muted">מלאי התחלתי נשמר כאצווה חדשה בעת יצירת מוצר.</div></div>`;
+      <div class="muted">${isExisting?"המלאי הקיים מוצג לקריאה בלבד כדי לשמור על היסטוריית הנטילות. אפשר להוסיף מלאי מכרטיס התרופה.":"הכמות תתווסף למלאי של התרופה בחוזק הזה."}</div></div>`;
   }
   async saveMedication(original) {
     const error=this.querySelector("#form-error");
