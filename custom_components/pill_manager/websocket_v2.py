@@ -38,6 +38,9 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
                     medication.get("products", []),
                     medication.get("regimen", {}),
                     current_date,
+                    medication_id=medication["id"],
+                    intake_records=data.get("intake", []),
+                    occurrences=data.get("occurrences", []),
                 )
             except (PillManagerError, KeyError, ValueError) as err:
                 medication["current_phase"] = None
