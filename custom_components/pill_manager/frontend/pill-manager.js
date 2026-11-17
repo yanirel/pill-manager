@@ -239,7 +239,7 @@ class PillManagerPanel extends HTMLElement {
   }
   async deleteMedication(id) {
     if(!confirm("למחוק את התרופה? היסטוריית נטילות קיימת מונעת מחיקה."))return;
-    try{await this.call("delete_medication",{medication_id:id});await this.load();}
+    try{await this.call("delete_medication",{medication_id:id});await this.load(true);}
     catch(err){alert("לא ניתן למחוק: "+err.message);}
   }
 }
