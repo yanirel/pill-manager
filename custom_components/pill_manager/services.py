@@ -41,19 +41,21 @@ async def async_setup_services(hass: HomeAssistant):
 
     async def take_dose(call: ServiceCall):
         store = get_store()
+        from copy import deepcopy
+        working = deepcopy(store.data)
         occurrence_id = call.data.get("occurrence_id")
-        existing_intake = next((x for x in store.data["intake"] if x.get("id") == call.data["intake_id"]), None)
+        existing_intake = next((x for x in working["intake"] if x.get("id") == call.data["intake_id"]), None)
         if existing_intake and existing_intake.get("status") != "undone":
             return
         intake_id = uuid4().hex if existing_intake else call.data["intake_id"]
         if occurrence_id:
             if any(x.get("occurrence_id") == occurrence_id and x.get("status") == "taken"
-                   for x in store.data["intake"]):
+                   for x in working["intake"]):
                 return
             if any(x.get("occurrence_id") == occurrence_id and x.get("status") in ("skipped", "missed")
-                   for x in store.data["occurrences"]):
+                   for x in working["occurrences"]):
                 raise HomeAssistantError("This dose was already skipped or marked missed")
-        medication = next((m for m in store.data["medications"]
+        medication = next((m for m in working["medications"]
                            if m["id"] == call.data["medication_id"]), None)
         if medication is None:
             raise HomeAssistantError("Medication not found")
@@ -64,11 +66,10 @@ async def async_setup_services(hass: HomeAssistant):
             allocation = allocate_dose(medication["products"], dose, taken_on)
             # Validate and consume on a working copy so a failed operation cannot
             # leave a partially changed in-memory inventory.
-            from copy import deepcopy
             updated_products = deepcopy(medication["products"])
             consume_allocation(updated_products, allocation)
             medication["products"] = updated_products
-            store.data["intake"].append({
+            working["intake"].append({
                 "id": intake_id,
                 "medication_id": medication["id"],
                 "occurrence_id": occurrence_id,
@@ -80,11 +81,12 @@ async def async_setup_services(hass: HomeAssistant):
                 "source": call.data.get("source", "manual"),
             })
             if occurrence_id:
-                occurrence = next((item for item in store.data["occurrences"]
+                occurrence = next((item for item in working["occurrences"]
                                    if item.get("occurrence_id") == occurrence_id), None)
                 if occurrence:
                     occurrence["status"] = "taken"
                     occurrence["updated_at"] = taken_at
+            store.data = working
             await store.async_save()
             hass.bus.async_fire(EVENT_V2_UPDATED)
         except (KeyError, TypeError, ValueError, PillManagerError) as err:
@@ -190,6 +192,9 @@ async def async_setup_services(hass: HomeAssistant):
             raise HomeAssistantError("Non-splittable stock must be a whole number")
         before = float(batch.get("quantity", 0))
         batch["quantity"] = new_quantity
+        if any(event.get("id") == call.data["event_id"]
+               for event in store.data.get("stock_events", [])):
+            raise HomeAssistantError("Stock event ID has already been used")
         store.data.setdefault("stock_events", []).append({
             "id": call.data["event_id"],
             "medication_id": medication["id"],
