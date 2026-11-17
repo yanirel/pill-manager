@@ -141,8 +141,38 @@ class PillManagerPanel extends HTMLElement {
     if(received===null)return;
     const expires=prompt("תאריך תפוגה (YYYY-MM-DD), או להשאיר ריק","");
     if(expires===null)return;
-    try{await this.call("add_stock",{medication_id:medicationId,product_id:productId,batch:{quantity:amount,received_at:received,expires_on:expires||null}});await this.load();}
+    try{await this.call("add_stock",{medication_id:medicationId,product_id:productId,batch:{quantity:amount,received_at:received,expires_on:expires||null}});await this.load(true);}
     catch(err){alert("לא ניתן להוסיף מלאי: "+err.message);}
+  }
+  async takeMedication(medication) {
+    if (!medication) return;
+    const phase = medication.current_phase;
+    let dose = phase?.dose_mg;
+    if (medication.regimen?.mode === "prn") {
+      dose = Number(prompt("כמה מ״ג לקחת בפועל?"));
+    } else if (!phase) {
+      return alert("אין משטר מינון פעיל לתאריך הנוכחי.");
+    }
+    if (!Number.isFinite(Number(dose)) || Number(dose) <= 0) return;
+    const now = new Date();
+    const pad = value => String(value).padStart(2, "0");
+    const occurrence = "panel:" + medication.id + ":" +
+      now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate())+":"+
+      pad(now.getHours())+":"+pad(now.getMinutes());
+    try {
+      await this._hass.callService("pill_manager", "take_dose", {
+        medication_id: medication.id,
+        intake_id: occurrence,
+        occurrence_id: occurrence,
+        actual_dose_mg: Number(dose),
+        ...(phase?.dose_mg != null ? {scheduled_dose_mg: phase.dose_mg} : {}),
+        taken_at: now.toISOString(),
+        source: "panel"
+      });
+      await this.load(true);
+    } catch (err) {
+      alert("לא ניתן לאשר נטילה: " + (err.message || err));
+    }
   }
   async deleteMedication(id) {
     if(!confirm("למחוק את התרופה? היסטוריית נטילות קיימת מונעת מחיקה."))return;
