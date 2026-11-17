@@ -1,0 +1,31 @@
+name: Engine tests
+on:
+  pull_request:
+  push:
+    branches: [main, feature/**]
+concurrency:
+  group: pill-manager-tests-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run pure engine tests
+        run: python -m unittest discover -s tests -v
+      - name: Import integration in Home Assistant 2026.9.1 runtime
+        run: |
+          docker run --rm -v "$PWD:/config" -w /config --entrypoint python ghcr.io/home-assistant/home-assistant:2026.9.1 -c "import custom_components.pill_manager; import custom_components.pill_manager.config_flow; import custom_components.pill_manager.notifications; import custom_components.pill_manager.services; import custom_components.pill_manager.sensor; import custom_components.pill_manager.binary_sensor; import custom_components.pill_manager.button; import custom_components.pill_manager.websocket; import custom_components.pill_manager.websocket_v2"
+      - name: Compile integration Python files
+        run: python -m compileall -q custom_components/pill_manager
+      - name: Check frontend JavaScript syntax
+        run: node --check custom_components/pill_manager/frontend/pill-manager.js
+      - name: Validate integration JSON
+        run: |
+          python -m json.tool custom_components/pill_manager/manifest.json > /dev/null
+          python -m json.tool custom_components/pill_manager/strings.json > /dev/null
+          python -m json.tool custom_components/pill_manager/translations/he.json > /dev/null
+          python -m json.tool hacs.json > /dev/null

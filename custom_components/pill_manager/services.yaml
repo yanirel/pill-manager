@@ -1,0 +1,143 @@
+take_dose:
+  name: Confirm medication intake
+  description: Record a confirmed dose and deduct the allocated stock using FIFO.
+  fields:
+    medication_id:
+      name: Medication ID
+      required: true
+      selector:
+        text:
+    intake_id:
+      name: Intake ID
+      required: true
+      selector:
+        text:
+    occurrence_id:
+      name: Occurrence ID
+      selector:
+        text:
+    actual_dose_mg:
+      name: Actual dose (mg)
+      required: true
+      selector:
+        number:
+          min: 0.5
+          step: 0.5
+    scheduled_dose_mg:
+      name: Scheduled dose (mg)
+      selector:
+        number:
+          min: 0.5
+          step: 0.5
+    taken_at:
+      name: Taken at (ISO 8601 with timezone)
+      required: true
+      selector:
+        text:
+    source:
+      name: Source
+      selector:
+        text:
+skip_dose:
+  name: Skip dose
+  description: Mark a scheduled occurrence as skipped without deducting stock.
+  fields:
+    medication_id:
+      name: Medication ID
+      required: true
+      selector:
+        text:
+    occurrence_id:
+      name: Occurrence ID
+      required: true
+      selector:
+        text:
+    updated_at:
+      name: Updated at (ISO 8601 with timezone)
+      required: true
+      selector:
+        text:
+undo_dose:
+  name: Undo intake
+  description: Restore the exact stock allocation from a previously recorded intake.
+  fields:
+    intake_id:
+      name: Intake ID
+      required: true
+      selector:
+        text:
+add_stock:
+  name: Add stock batch
+  description: Add a received stock batch to a medication product.
+  fields:
+    medication_id:
+      name: Medication ID
+      required: true
+      selector:
+        text:
+    product_id:
+      name: Product ID
+      required: true
+      selector:
+        text:
+    batch_id:
+      name: Batch ID
+      required: true
+      selector:
+        text:
+    quantity:
+      name: Quantity
+      required: true
+      selector:
+        number:
+          min: 0.5
+          step: 0.5
+    received_at:
+      name: Received at (ISO 8601 date or datetime)
+      required: true
+      selector:
+        text:
+    expires_on:
+      name: Expiry date
+      selector:
+        text:
+adjust_stock:
+  name: Correct stock
+  description: Set a batch balance manually and record an audit event. Negative balances are retained as warnings.
+  fields:
+    medication_id:
+      name: Medication ID
+      required: true
+      selector:
+        text:
+    product_id:
+      name: Product ID
+      required: true
+      selector:
+        text:
+    batch_id:
+      name: Batch ID
+      required: true
+      selector:
+        text:
+    quantity:
+      name: New quantity
+      required: true
+      selector:
+        number:
+          step: 0.5
+    reason:
+      name: Reason
+      required: true
+      selector:
+        text:
+    event_id:
+      name: Event ID
+      required: true
+      selector:
+        text:
+    created_at:
+      name: Created at (ISO 8601 with timezone)
+      required: true
+      selector:
+        text:
