@@ -40,13 +40,16 @@ def validate_medication(med):
             if not product.get("splittable", False) and not quantity.is_integer():
                 raise PillManagerError("Non-splittable product stock must be whole tablets")
             if batch.get("expires_on"):
-                date.fromisoformat(batch["expires_on"])
+                try:
+                    date.fromisoformat(batch["expires_on"])
+                except (TypeError, ValueError) as err:
+                    raise PillManagerError("expires_on must use YYYY-MM-DD") from err
             if not batch.get("received_at"):
                 raise PillManagerError("Every stock batch needs received_at")
             value = str(batch["received_at"])
             try:
                 date.fromisoformat(value[:10])
-            except ValueError as err:
+            except (TypeError, ValueError) as err:
                 raise PillManagerError("received_at must be an ISO date or datetime") from err
 
     validate_regimen(med.get("regimen", {}))
