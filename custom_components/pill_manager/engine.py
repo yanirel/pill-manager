@@ -93,6 +93,10 @@ def _inventory_units(products, on_date):
         for batch_index, batch in enumerate(product.get("stock_batches", [])):
             if on_date and batch.get("expires_on") and date.fromisoformat(batch["expires_on"]) < on_date:
                 continue
+            if on_date and batch.get("received_at"):
+                received_date = date.fromisoformat(str(batch["received_at"])[:10])
+                if received_date > on_date:
+                    continue
             count = int(round(float(batch.get("quantity", 0)) * (2 if splittable else 1)))
             received = batch.get("received_at", "")
             for unit_index in range(count):
