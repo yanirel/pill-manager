@@ -185,13 +185,24 @@ async def async_setup_services(hass: HomeAssistant):
                 date.fromisoformat(call.data["expires_on"])
             except ValueError as err:
                 raise HomeAssistantError("Expiry date must use YYYY-MM-DD") from err
-        product.setdefault("stock_batches", []).append({
+        received_at = _parse_received_at(call.data["received_at"])
+        from copy import deepcopy
+        working = deepcopy(store.data)
+        working_med = next(m for m in working["medications"] if m["id"] == call.data["medication_id"])
+        working_product = next(p for p in working_med["products"] if p["id"] == call.data["product_id"])
+        working_product.setdefault("stock_batches", []).append({
             "id": call.data["batch_id"],
             "quantity": quantity,
             "expires_on": call.data.get("expires_on"),
-            "received_at": _parse_received_at(call.data["received_at"]),
+            "received_at": received_at,
         })
-        await store.async_save()
+        previous_data = store.data
+        store.data = working
+        try:
+            await store.async_save()
+        except Exception:
+            store.data = previous_data
+            raise
         hass.bus.async_fire(EVENT_V2_UPDATED)
 
     async def adjust_stock(call: ServiceCall):
