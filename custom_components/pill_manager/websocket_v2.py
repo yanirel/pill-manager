@@ -60,19 +60,21 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
             validate_medication(medication)
         except PillManagerError as err:
             raise HomeAssistantError(str(err)) from err
-        existing = next((i for i, item in enumerate(store.data["medications"])
+        previous_data = store.data
+        working = deepcopy(previous_data)
+        existing = next((i for i, item in enumerate(working["medications"])
                          if item["id"] == medication["id"]), None)
         if existing is None:
-            store.data["medications"].append(medication)
+            working["medications"].append(medication)
         else:
             # A still-active intake may need to be undone later. Do not allow
             # editing away a product or batch referenced by its allocation.
             protected = {}
-            for intake in store.data.get("intake", []):
+            for intake in previous_data.get("intake", []):
                 if intake.get("medication_id") == medication["id"] and intake.get("status") == "taken":
                     for allocation in intake.get("allocation", []):
                         key = (allocation.get("product_id"), allocation.get("batch_id"))
-                        old_product = next((p for p in store.data["medications"][existing].get("products", [])
+                        old_product = next((p for p in previous_data["medications"][existing].get("products", [])
                                             if p.get("id") == key[0]), None)
                         old_batch = next((b for b in old_product.get("stock_batches", [])
                                           if b.get("id") == key[1]), None) if old_product else None
@@ -92,8 +94,13 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
                     raise HomeAssistantError(
                         "A product or stock batch used by a confirmed intake cannot be changed or removed. Use stock adjustment for quantity corrections."
                     )
-            store.data["medications"][existing] = medication
-        await store.async_save()
+            working["medications"][existing] = medication
+        store.data = working
+        try:
+            await store.async_save()
+        except Exception:
+            store.data = previous_data
+            raise
         hass.bus.async_fire(EVENT_V2_UPDATED)
         connection.send_result(msg["id"], medication)
 
@@ -108,10 +115,18 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
         if any(item.get("medication_id") == med_id
                for item in store.data.get("intake", [])):
             raise HomeAssistantError("Cannot delete a medication with intake history")
-        store.data["medications"] = [
-            item for item in store.data["medications"] if item["id"] != med_id
+        previous_data = store.data
+        from copy import deepcopy
+        working = deepcopy(previous_data)
+        working["medications"] = [
+            item for item in working["medications"] if item["id"] != med_id
         ]
-        await store.async_save()
+        store.data = working
+        try:
+            await store.async_save()
+        except Exception:
+            store.data = previous_data
+            raise
         hass.bus.async_fire(EVENT_V2_UPDATED)
         connection.send_result(msg["id"], {})
 
