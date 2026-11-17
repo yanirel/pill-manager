@@ -13,6 +13,7 @@ from .storage import PillStore
 from .storage_v2 import PillManagerStorage
 from .services import async_setup_services
 from .websocket import async_setup_websocket
+from .websocket_v2 import async_setup_v2_websocket
 
 PLATFORMS: list[str] = []
 
@@ -20,6 +21,7 @@ PLATFORMS: list[str] = []
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration domain."""
     async_setup_websocket(hass)
+    async_setup_v2_websocket(hass)
     return True
 
 
