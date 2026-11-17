@@ -1,5 +1,5 @@
 class PillManagerPanel extends HTMLElement {
-  set hass(value) { this._hass = value; this.load(); }
+  set hass(value) { this._hass = value; if (!this._loaded) this.load(); }
   connectedCallback() { this.load(); }
   async call(command, data = {}) {
     return this._hass.callWS({type: "pill_manager_v2/" + command, ...data});
@@ -7,10 +7,10 @@ class PillManagerPanel extends HTMLElement {
   esc(value) {
     return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   }
-  async load() {
-    if (!this._hass || this._loading) return;
+  async load(force = false) {
+    if (!this._hass || this._loading || (this._loaded && !force)) return;
     this._loading = true;
-    try { this.data = await this.call("get_data"); this.error = ""; }
+    try { this.data = await this.call("get_data"); this.error = ""; this._loaded = true; }
     catch (err) { this.error = err.message || String(err); }
     finally { this._loading = false; this.render(); }
   }
@@ -129,7 +129,7 @@ class PillManagerPanel extends HTMLElement {
         regimen={mode:"phased",phases:JSON.parse(this.querySelector("#phase-json").value)};
       }
       await this.call("save_medication",{medication:{...original,name,products,regimen}});
-      await this.load();
+      await this.load(true);
     } catch(err) { error.textContent=err.message||String(err); }
   }
   async addStock(medicationId,productId) {
