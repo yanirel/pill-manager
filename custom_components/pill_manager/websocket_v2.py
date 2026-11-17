@@ -7,6 +7,7 @@ from uuid import uuid4
 import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN, EVENT_V2_UPDATED
 from .models import validate_medication, empty_database
@@ -16,7 +17,7 @@ from .engine import forecast, active_phase, PillManagerError
 def _store(hass: HomeAssistant):
     entries = hass.data.get(f"{DOMAIN}_v2", {})
     if not entries:
-        raise ValueError("Pill Manager v2 is not loaded")
+        raise HomeAssistantError("Pill Manager v2 is not loaded")
     return next(iter(entries.values()))
 
 
@@ -52,12 +53,29 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
         store = _store(hass)
         medication = deepcopy(msg["medication"])
         medication["id"] = medication.get("id") or uuid4().hex
-        validate_medication(medication)
+        try:
+            validate_medication(medication)
+        except PillManagerError as err:
+            raise HomeAssistantError(str(err)) from err
         existing = next((i for i, item in enumerate(store.data["medications"])
                          if item["id"] == medication["id"]), None)
         if existing is None:
             store.data["medications"].append(medication)
         else:
+            # A still-active intake may need to be undone later. Do not allow
+            # editing away a product or batch referenced by its allocation.
+            protected = set()
+            for intake in store.data.get("intake", []):
+                if intake.get("medication_id") == medication["id"] and intake.get("status") == "taken":
+                    for allocation in intake.get("allocation", []):
+                        protected.add((allocation.get("product_id"), allocation.get("batch_id")))
+            available = {
+                (product.get("id"), batch.get("id"))
+                for product in medication.get("products", [])
+                for batch in product.get("stock_batches", [])
+            }
+            if not protected.issubset(available):
+                raise HomeAssistantError("Cannot remove a product or stock batch referenced by an intake that can still be undone")
             store.data["medications"][existing] = medication
         await store.async_save()
         hass.bus.async_fire(EVENT_V2_UPDATED)
@@ -73,7 +91,7 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
         med_id = msg["medication_id"]
         if any(item.get("medication_id") == med_id
                for item in store.data.get("intake", [])):
-            raise ValueError("Cannot delete a medication with intake history")
+            raise HomeAssistantError("Cannot delete a medication with intake history")
         store.data["medications"] = [
             item for item in store.data["medications"] if item["id"] != med_id
         ]
@@ -93,19 +111,22 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
         med = next((m for m in store.data["medications"]
                     if m["id"] == msg["medication_id"]), None)
         if med is None:
-            raise ValueError("Medication not found")
+            raise HomeAssistantError("Medication not found")
         product = next((p for p in med.get("products", [])
                         if p["id"] == msg["product_id"]), None)
         if product is None:
-            raise ValueError("Product not found")
+            raise HomeAssistantError("Product not found")
         batch = deepcopy(msg["batch"])
         batch["id"] = batch.get("id") or uuid4().hex
         if any(b["id"] == batch["id"] for b in product.get("stock_batches", [])):
-            raise ValueError("Batch ID already exists")
+            raise HomeAssistantError("Batch ID already exists")
         if float(batch.get("quantity", 0)) <= 0:
-            raise ValueError("Stock quantity must be positive")
+            raise HomeAssistantError("Stock quantity must be positive")
         product.setdefault("stock_batches", []).append(batch)
-        validate_medication(med)
+        try:
+            validate_medication(med)
+        except PillManagerError as err:
+            raise HomeAssistantError(str(err)) from err
         await store.async_save()
         hass.bus.async_fire(EVENT_V2_UPDATED)
         connection.send_result(msg["id"], batch)
