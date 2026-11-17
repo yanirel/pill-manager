@@ -85,7 +85,7 @@ class PillManagerPanel extends HTMLElement {
     if(history.length){
       const section=document.createElement("section");
       section.className="card section";
-      section.innerHTML="<h2>נטילות אחרונות</h2>"+history.map(x=>`<div class="stock line"><span>${this.esc(x.medication_id)} · ${Number(x.actual_dose_mg||0)} מ״ג</span><span class="muted">${this.esc(x.taken_at||"")}</span></div>`).join("");
+      section.innerHTML="<h2>נטילות אחרונות</h2>"+history.map(x=>{const med=(this.data.medications||[]).find(m=>m.id===x.medication_id);return `<div class="stock line"><span>${this.esc(med?.name||"תרופה")} · ${Number(x.actual_dose_mg||0)} מ״ג</span><span class="muted">${this.esc(x.taken_at||"")}</span></div>`;}).join("");
       root.appendChild(section);
     }
   }
