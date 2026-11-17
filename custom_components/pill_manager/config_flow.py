@@ -13,6 +13,7 @@ DEFAULT_OPTIONS = {
     "missed_after_minutes": 120,
     "missed_dose_action": "ask",
     "auto_deduct_stock": False,
+    "notify_service": "",
 }
 
 
@@ -56,5 +57,6 @@ class PillManagerOptionsFlow(config_entries.OptionsFlow):
                          default=current["missed_dose_action"]): vol.In(["ask", "mark_missed"]),
             vol.Required("auto_deduct_stock",
                          default=current["auto_deduct_stock"]): bool,
+            vol.Optional("notify_service", default=current["notify_service"]): str,
         })
         return self.async_show_form(step_id="init", data_schema=schema)
