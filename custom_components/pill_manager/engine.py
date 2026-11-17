@@ -91,6 +91,11 @@ def _inventory_units(products, on_date):
         if step <= 0:
             continue
         for batch_index, batch in enumerate(product.get("stock_batches", [])):
+            quantity = float(batch.get("quantity", 0))
+            if splittable and abs(quantity * 2 - round(quantity * 2)) > 1e-7:
+                raise PillManagerError("Splittable stock quantities must use 0.5 tablet increments")
+            if not splittable and abs(quantity - round(quantity)) > 1e-7:
+                raise PillManagerError("Non-splittable stock quantities must be whole tablets")
             if on_date and batch.get("expires_on") and date.fromisoformat(batch["expires_on"]) < on_date:
                 continue
             if on_date and batch.get("received_at"):
