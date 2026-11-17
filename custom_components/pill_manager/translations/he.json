@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "הגדרת Pill Manager",
+        "description": "הוספת מערכת מקומית לניהול תרופות, מלאי והיסטוריית נטילה."
+      }
+    },
+    "abort": {
+      "already_configured": "Pill Manager כבר הוגדר."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "הגדרות כלליות",
+        "description": "הגדרות תזכורות, חלון אישור והתנהגות מלאי."
+      }
+    }
+  }
+}
