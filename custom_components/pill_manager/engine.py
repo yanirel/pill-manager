@@ -138,16 +138,22 @@ def allocate_dose(products: list[dict[str, Any]], target_mg: float,
     target = int(round(target_mg * 2))
     options = _inventory_units(products, on_date)
     # 0/1 subset-sum: each physical half/full tablet portion can be used once.
-    dp = {0: (0, ())}
+    # Prefer the fewest whole-tablet equivalents (e.g. 50 + 25 over 25 + 25 + 25),
+    # then use FIFO order as the tie-breaker so older stock is consumed first.
+    dp = {0: (0.0, ())}
     for idx, option in enumerate(options):
         step = option[4]
-        for total, (count, chosen) in sorted(list(dp.items()), reverse=True):
+        portion_size = option[7]
+        for total, (tablet_equivalents, chosen) in sorted(list(dp.items()), reverse=True):
             new_total = total + step
             candidate = chosen + (idx,)
-            if new_total <= target and (new_total not in dp or candidate < dp[new_total][1]):
-                # FIFO takes precedence over minimizing tablet portions: never
-                # consume newer stock merely because it uses fewer pieces.
-                dp[new_total] = (count + 1, candidate)
+            new_score = tablet_equivalents + portion_size
+            if new_total <= target and (
+                new_total not in dp
+                or new_score < dp[new_total][0] - 1e-9
+                or (abs(new_score - dp[new_total][0]) <= 1e-9 and candidate < dp[new_total][1])
+            ):
+                dp[new_total] = (new_score, candidate)
     if target not in dp:
         raise PillManagerError(f"Insufficient compatible stock for {target_mg:g} mg")
     grouped = {}
