@@ -86,8 +86,13 @@ async def async_setup_services(hass: HomeAssistant):
                 if occurrence:
                     occurrence["status"] = "taken"
                     occurrence["updated_at"] = taken_at
+            previous_data = store.data
             store.data = working
-            await store.async_save()
+            try:
+                await store.async_save()
+            except Exception:
+                store.data = previous_data
+                raise
             hass.bus.async_fire(EVENT_V2_UPDATED)
         except (KeyError, TypeError, ValueError, PillManagerError) as err:
             raise HomeAssistantError(str(err)) from err
@@ -120,6 +125,8 @@ async def async_setup_services(hass: HomeAssistant):
             raise HomeAssistantError("Intake record not found")
         if record.get("status") == "undone":
             return
+        if record.get("source") == "legacy_import" or not record.get("allocation"):
+            raise HomeAssistantError("Imported historical records cannot be undone because their original batch allocation is unknown")
         medication = next((m for m in store.data["medications"]
                            if m["id"] == record["medication_id"]), None)
         if medication is None:
@@ -190,11 +197,11 @@ async def async_setup_services(hass: HomeAssistant):
                 raise HomeAssistantError("Splittable stock must use 0.5 tablet increments")
         elif not new_quantity.is_integer():
             raise HomeAssistantError("Non-splittable stock must be a whole number")
-        before = float(batch.get("quantity", 0))
-        batch["quantity"] = new_quantity
         if any(event.get("id") == call.data["event_id"]
                for event in store.data.get("stock_events", [])):
             raise HomeAssistantError("Stock event ID has already been used")
+        before = float(batch.get("quantity", 0))
+        batch["quantity"] = new_quantity
         store.data.setdefault("stock_events", []).append({
             "id": call.data["event_id"],
             "medication_id": medication["id"],
