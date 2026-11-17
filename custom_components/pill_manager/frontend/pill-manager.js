@@ -1,6 +1,23 @@
 class PillManagerPanel extends HTMLElement {
-  set hass(value) { this._hass = value; if (!this._loaded) this.load(); }
+  set hass(value) {
+    this._hass = value;
+    if (!this._subscribed && value?.connection?.subscribeEvents) {
+      this._subscribed = true;
+      value.connection.subscribeEvents(() => this.load(true), "pill_manager_v2_updated")
+        .then(unsubscribe => {
+          if (this.isConnected) this._unsubscribeEvents = unsubscribe;
+          else unsubscribe();
+        })
+        .catch(() => { this._subscribed = false; });
+    }
+    if (!this._loaded) this.load();
+  }
   connectedCallback() { this.load(); }
+  disconnectedCallback() {
+    this._unsubscribeEvents?.();
+    this._unsubscribeEvents = null;
+    this._subscribed = false;
+  }
   async call(command, data = {}) {
     return this._hass.callWS({type: "pill_manager_v2/" + command, ...data});
   }
