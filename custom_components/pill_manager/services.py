@@ -132,6 +132,13 @@ async def async_setup_services(hass: HomeAssistant):
         quantity = float(call.data["quantity"])
         if quantity <= 0:
             raise HomeAssistantError("Stock quantity must be positive")
+        if not product.get("splittable", False) and not quantity.is_integer():
+            raise HomeAssistantError("Non-splittable stock must be a whole number")
+        if call.data.get("expires_on"):
+            try:
+                date.fromisoformat(call.data["expires_on"])
+            except ValueError as err:
+                raise HomeAssistantError("Expiry date must use YYYY-MM-DD") from err
         product.setdefault("stock_batches", []).append({
             "id": call.data["batch_id"],
             "quantity": quantity,
