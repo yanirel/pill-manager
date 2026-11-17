@@ -2,25 +2,26 @@
 
 A local-first medication inventory and intake tracker for Home Assistant.
 
-## Features
-- Dedicated Home Assistant sidebar panel
-- Separate stock per medication strength
-- Intake is recorded only after explicit confirmation
-- Persistent intake history and corrections
-- Dose schedules with date ranges, weekdays, and times
-- Stock forecast and low-stock warnings
-- Local storage in Home Assistant; no cloud account or external service
+## Planned capabilities
+- Separate medication, product strength, stock batch, and dose regimen records.
+- Dose tracking in milligrams, with support for combining strengths and half tablets.
+- Fixed, phased/tapered, and as-needed (PRN) regimens.
+- FIFO stock allocation, expiry-aware inventory, and future regimen forecasting.
+- Explicit intake confirmation; scheduled reminders do not automatically consume stock by default.
+- Hebrew, standalone Home Assistant sidebar panel.
+- Local persistence in Home Assistant.
 
-## Installation
-1. Install **Pill Manager** using HACS → Integrations → Custom repositories.
-2. Add `https://github.com/yanirel/pill-manager` as an Integration repository if it is not listed in the HACS store.
-3. Download and restart Home Assistant.
-4. Go to Settings → Devices & services → Add integration → Pill Manager.
+## Development status
 
-The panel appears in the Home Assistant sidebar.
+The active development work is on the feature/core-v2 branch and in [draft pull request #1](https://github.com/yanirel/pill-manager/pull/1).
+
+**This is not a released or installable version.** The v2 panel and core API are being built and tested. Notifications, Home Assistant entities, migration, and full end-to-end validation are still in progress. Do not install this development branch on a production Home Assistant instance yet.
+
+## Development tests
+The GitHub Actions workflow runs the pure calculation-engine tests, compiles the integration Python files, checks the panel JavaScript syntax, and validates integration JSON files.
 
 ## Data and privacy
-Medication names, schedules, stock, and intake history are stored locally in Home Assistant's `/config/.storage/pill_manager` file. Do not put personal medication information in GitHub issues.
+The v2 data store uses Home Assistant's local .storage system under the separate key pill_manager_v2. The existing legacy store is intentionally kept separate during development. Do not put personal medication information in GitHub issues.
 
-## Status
-Early development. Test carefully before relying on it for medication decisions. It is a tracking and reminder aid, not medical advice.
+## Safety
+Pill Manager is a tracking and reminder aid, not medical advice. It does not recommend or change prescribed doses.
