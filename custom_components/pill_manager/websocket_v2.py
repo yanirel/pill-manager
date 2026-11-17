@@ -122,12 +122,22 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
             raise HomeAssistantError("Batch ID already exists")
         if float(batch.get("quantity", 0)) <= 0:
             raise HomeAssistantError("Stock quantity must be positive")
-        product.setdefault("stock_batches", []).append(batch)
+        from copy import deepcopy
+        working = deepcopy(store.data)
+        working_med = next(m for m in working["medications"] if m["id"] == msg["medication_id"])
+        working_product = next(p for p in working_med["products"] if p["id"] == msg["product_id"])
+        working_product.setdefault("stock_batches", []).append(batch)
         try:
-            validate_medication(med)
+            validate_medication(working_med)
         except PillManagerError as err:
             raise HomeAssistantError(str(err)) from err
-        await store.async_save()
+        previous_data = store.data
+        store.data = working
+        try:
+            await store.async_save()
+        except Exception:
+            store.data = previous_data
+            raise
         hass.bus.async_fire(EVENT_V2_UPDATED)
         connection.send_result(msg["id"], batch)
 
