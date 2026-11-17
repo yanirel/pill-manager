@@ -1,0 +1,10 @@
+{
+  "domain": "pill_manager",
+  "name": "Pill Manager",
+  "codeowners": ["@yanirel"],
+  "config_flow": true,
+  "documentation": "https://github.com/yanirel/pill-manager",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/yanirel/pill-manager/issues",
+  "version": "0.1.0"
+}
