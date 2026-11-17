@@ -51,11 +51,16 @@ def validate_regimen(regimen: dict[str, Any]) -> None:
     if not phases:
         raise PillManagerError("A phased regimen needs at least one phase")
     previous_end = None
+    previous_open = False
     for index, phase in enumerate(phases):
         try:
             start = date.fromisoformat(phase["start_date"])
         except (KeyError, TypeError, ValueError) as err:
             raise PillManagerError("Every phase needs a valid start_date") from err
+        if previous_open:
+            raise PillManagerError("An open-ended phase must be the final phase")
+        if previous_end is not None and start <= previous_end:
+            raise PillManagerError("Treatment periods cannot overlap")
         try:
             dose = float(phase.get("dose_mg", 0))
         except (TypeError, ValueError) as err:
@@ -63,8 +68,6 @@ def validate_regimen(regimen: dict[str, Any]) -> None:
         if dose <= 0:
             raise PillManagerError("Every phase needs a positive dose_mg")
         duration = phase.get("duration_days")
-        if index < len(phases) - 1 and duration is None:
-            raise PillManagerError("Only the final phase may be open-ended")
         if duration is not None:
             try:
                 duration = int(duration)
@@ -72,12 +75,9 @@ def validate_regimen(regimen: dict[str, Any]) -> None:
                 raise PillManagerError("duration_days must be a positive integer") from err
             if duration < 1:
                 raise PillManagerError("duration_days must be positive")
-        if previous_end is not None and start != previous_end + timedelta(days=1):
-            raise PillManagerError("Phases must be consecutive with no gaps or overlaps")
+        previous_open = duration is None
         previous_end = start + timedelta(days=duration - 1) if duration is not None else None
         _validate_phase_schedule(phase)
-    if phases[-1].get("duration_days") is not None:
-        raise PillManagerError("The final phase must be open-ended")
 
 
 def _validate_phase_schedule(phase: dict[str, Any]) -> None:
