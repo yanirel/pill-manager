@@ -137,7 +137,7 @@ class PillManagerPanel extends HTMLElement {
       <section class="card editor"><h2>${existing?"עריכת תרופה":"הוספת תרופה"}</h2>
         <div class="form"><div class="wide"><label>שם התרופה</label><input id="med-name" value="${this.esc(med.name)}" placeholder="לדוגמה: תרופה"></div>
           <div><label>סוג משטר</label><select id="mode"><option value="fixed" ${med.regimen?.mode==="fixed"?"selected":""}>מינון קבוע</option><option value="phased" ${phased?"selected":""}>שלבים מדורגים</option><option value="prn" ${med.regimen?.mode==="prn"?"selected":""}>לפי הצורך (PRN)</option></select></div>
-          <div id="fixed-dose"><label>מינון יומי במ״ג</label><input id="dose" type="number" min="0.5" step="0.5" value="${med.regimen?.fixed_phase?.dose_mg||25}"></div>
+          <div id="fixed-dose"><label>מינון לכל נטילה במ״ג</label><input id="dose" type="number" min="0.5" step="0.5" value="${med.regimen?.fixed_phase?.dose_mg||25}"></div>
           <div id="fixed-times" class="wide"><label>שעות נטילה (מופרדות בפסיק)</label><input id="times" value="${(med.regimen?.fixed_phase?.times||["08:00"]).join(", ")}"></div>
         </div>
         <div id="phases" style="display:${phased?"block":"none"}">
