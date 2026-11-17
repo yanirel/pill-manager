@@ -93,6 +93,17 @@ class EngineTests(unittest.TestCase):
         with self.assertRaises(PillManagerError):
             validate_regimen(regimen)
 
+    def test_forecast_does_not_count_already_taken_dose_today(self):
+        products = [product("p25", 25, 1, "2026-01-01", True)]
+        regimen = {"mode": "fixed", "fixed_phase": {
+            "dose_mg": 25, "times": ["08:00", "20:00"]}}
+        result = forecast(
+            products, regimen, date(2026, 11, 17), max_days=3,
+            medication_id="med",
+            intake_records=[{"occurrence_id": "med:2026-11-17:08:00", "status": "taken"}],
+        )
+        self.assertEqual(result["depletion_date"], "2026-11-18")
+
 
 if __name__ == "__main__":
     unittest.main()
