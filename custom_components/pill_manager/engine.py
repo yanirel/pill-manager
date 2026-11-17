@@ -137,18 +137,27 @@ def allocate_dose(products: list[dict[str, Any]], target_mg: float,
         raise PillManagerError("Dose must be positive and representable to 0.5 mg")
     target = int(round(target_mg * 2))
     options = _inventory_units(products, on_date)
-    # 0/1 subset-sum: each physical half/full tablet portion can be used once.
-    # Prefer the fewest whole-tablet equivalents (e.g. 50 + 25 over 25 + 25 + 25),
-    # then use FIFO order as the tie-breaker so older stock is consumed first.
-    dp = {0: (0.0, ())}
+    # 0/1 subset-sum: each half/full tablet portion can be used once.
+    # Score distinct physical tablets, not portions: using both halves of one
+    # tablet is still one tablet, and using one half is also one tablet.
+    # FIFO order breaks ties after minimizing the number of physical tablets.
+    def physical_tablet_count(indices):
+        physical = set()
+        for option_index in indices:
+            option = options[option_index]
+            product_index, batch_index, unit_index = option[1], option[2], option[3]
+            is_split = bool(option[5].get("splittable", False))
+            physical_index = unit_index // 2 if is_split else unit_index
+            physical.add((product_index, batch_index, physical_index))
+        return len(physical)
+
+    dp = {0: (0, ())}
     for idx, option in enumerate(options):
         step = option[4]
-        for total, (tablet_count, chosen) in sorted(list(dp.items()), reverse=True):
+        for total, (_tablet_count, chosen) in sorted(list(dp.items()), reverse=True):
             new_total = total + step
             candidate = chosen + (idx,)
-            # A half-tablet still means handling one physical tablet. Count
-            # tablet portions as tablets, not fractional equivalents.
-            new_score = tablet_count + 1
+            new_score = physical_tablet_count(candidate)
             if new_total <= target and (
                 new_total not in dp
                 or new_score < dp[new_total][0]
