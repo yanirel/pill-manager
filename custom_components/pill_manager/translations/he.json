@@ -2,19 +2,25 @@
   "config": {
     "step": {
       "user": {
-        "title": "הגדרת Pill Manager",
+        "title": "הגדרת מנהל התרופות",
         "description": "הוספת מערכת מקומית לניהול תרופות, מלאי והיסטוריית נטילה."
       }
     },
     "abort": {
-      "already_configured": "Pill Manager כבר הוגדר."
+      "already_configured": "מנהל התרופות כבר הוגדר."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "הגדרות כלליות",
-        "description": "הגדרות תזכורות, חלון אישור והתנהגות מלאי."
+        "title": "הגדרות תזכורות ומלאי",
+        "description": "הגדרת תדירות תזכורות ואופן הטיפול במלאי.",
+        "data": {
+          "reminder_repeat_minutes": "חזרה על תזכורת כל (דקות)",
+          "missed_after_minutes": "סימון כמנה שהוחמצה לאחר (דקות)",
+          "missed_dose_action": "מה לעשות כשמנה מתעכבת",
+          "auto_deduct_stock": "הפחתת מלאי אוטומטית לפי לוח הזמנים"
+        }
       }
     }
   }
