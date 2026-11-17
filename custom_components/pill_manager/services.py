@@ -32,6 +32,8 @@ async def async_setup_services(hass: HomeAssistant):
     async def take_dose(call: ServiceCall):
         store = get_store()
         occurrence_id = call.data.get("occurrence_id")
+        if any(x.get("id") == call.data["intake_id"] for x in store.data["intake"]):
+            return
         if occurrence_id:
             if any(x.get("occurrence_id") == occurrence_id and x.get("status") == "taken"
                    for x in store.data["intake"]):
@@ -44,6 +46,7 @@ async def async_setup_services(hass: HomeAssistant):
         if medication is None:
             raise HomeAssistantError("Medication not found")
         try:
+            taken_at = _parse_iso_datetime(call.data["taken_at"])
             dose = float(call.data["actual_dose_mg"])
             allocation = allocate_dose(medication["products"], dose)
             # Validate and consume on a working copy so a failed operation cannot
@@ -58,7 +61,7 @@ async def async_setup_services(hass: HomeAssistant):
                 "occurrence_id": occurrence_id,
                 "actual_dose_mg": dose,
                 "scheduled_dose_mg": call.data.get("scheduled_dose_mg"),
-                "taken_at": _parse_iso_datetime(call.data["taken_at"]),
+                "taken_at": taken_at,
                 "allocation": allocation,
                 "status": "taken",
                 "source": call.data.get("source", "manual"),
