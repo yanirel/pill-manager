@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from uuid import uuid4
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -40,8 +41,10 @@ async def async_setup_services(hass: HomeAssistant):
     async def take_dose(call: ServiceCall):
         store = get_store()
         occurrence_id = call.data.get("occurrence_id")
-        if any(x.get("id") == call.data["intake_id"] for x in store.data["intake"]):
+        existing_intake = next((x for x in store.data["intake"] if x.get("id") == call.data["intake_id"]), None)
+        if existing_intake and existing_intake.get("status") != "undone":
             return
+        intake_id = uuid4().hex if existing_intake else call.data["intake_id"]
         if occurrence_id:
             if any(x.get("occurrence_id") == occurrence_id and x.get("status") == "taken"
                    for x in store.data["intake"]):
@@ -65,7 +68,7 @@ async def async_setup_services(hass: HomeAssistant):
             consume_allocation(updated_products, allocation)
             medication["products"] = updated_products
             store.data["intake"].append({
-                "id": call.data["intake_id"],
+                "id": intake_id,
                 "medication_id": medication["id"],
                 "occurrence_id": occurrence_id,
                 "actual_dose_mg": dose,
