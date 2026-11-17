@@ -20,8 +20,8 @@
           "missed_after_minutes": "Mark as missed after (minutes)",
           "missed_dose_action": "When a dose is overdue",
           "auto_deduct_stock": "Automatically deduct stock on schedule",
-          "notify_entity": "Notify entity (basic notifications)",
-          "notify_service": "Legacy mobile_app notify service (action buttons)"
+          "notify_entity": "Notify entity (recommended; no action buttons)",
+          "notify_service": "Legacy mobile_app service (action buttons)"
         }
       }
     }
