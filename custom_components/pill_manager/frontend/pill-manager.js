@@ -117,7 +117,12 @@ class PillManagerPanel extends HTMLElement {
       regimen:{mode:"fixed",fixed_phase:{dose_mg:25,times:["08:00"],weekdays:[0,1,2,3,4,5,6]}}
     };
     const phased=med.regimen?.mode==="phased";
-    const phaseText=JSON.stringify(med.regimen?.phases||[],null,2);
+    const phaseDefaults=med.regimen?.phases?.length?med.regimen.phases:[{
+      start_date:new Date().toISOString().slice(0,10),duration_days:null,
+      dose_mg:med.regimen?.fixed_phase?.dose_mg||25,
+      times:med.regimen?.fixed_phase?.times||["08:00"],
+      weekdays:med.regimen?.fixed_phase?.weekdays||[0,1,2,3,4,5,6]
+    }];
     this.querySelector("#editor").innerHTML=`
       <section class="card editor"><h2>${existing?"עריכת תרופה":"הוספת תרופה"}</h2>
         <div class="form"><div class="wide"><label>שם התרופה</label><input id="med-name" value="${this.esc(med.name)}" placeholder="לדוגמה: תרופה"></div>
@@ -125,7 +130,12 @@ class PillManagerPanel extends HTMLElement {
           <div id="fixed-dose"><label>מינון יומי במ״ג</label><input id="dose" type="number" min="0.5" step="0.5" value="${med.regimen?.fixed_phase?.dose_mg||25}"></div>
           <div id="fixed-times" class="wide"><label>שעות נטילה (מופרדות בפסיק)</label><input id="times" value="${(med.regimen?.fixed_phase?.times||["08:00"]).join(", ")}"></div>
         </div>
-        <div id="phases" style="display:${phased?"block":"none"}"><label>שלבי מינון בפורמט JSON (כל שלב: start_date, duration_days, dose_mg, times; השלב האחרון ללא duration_days)</label><textarea id="phase-json">${this.esc(phaseText)}</textarea></div>
+        <div id="phases" style="display:${phased?"block":"none"}">
+          <label>שלבי מינון — השלב האחרון ממשיך עד שתעדכן אותו</label>
+          <div id="phase-list">${phaseDefaults.map((p,i)=>this.phaseEditor(p,i)).join("")}</div>
+          <div class="actions"><button class="secondary" id="add-phase">+ הוספת שלב</button><button class="secondary" id="remove-phase">הסרת השלב האחרון</button></div>
+          <div class="muted">השלבים חייבים להיות רצופים. משך שלב נמדד בימים, ושעות וימי נטילה מוגדרים לכל שלב בנפרד.</div>
+        </div>
         <h2 class="section">מוצרים וחוזקים</h2><div id="products">${med.products.map((p,i)=>this.productEditor(p,i)).join("")}</div>
         <div class="actions"><button class="secondary" id="add-product">+ הוספת חוזק / מוצר</button></div>
         <div class="actions"><button id="save">שמירה</button><button class="secondary" id="cancel">ביטול</button></div>
@@ -134,7 +144,43 @@ class PillManagerPanel extends HTMLElement {
     this.querySelector("#cancel").onclick=()=>this.querySelector("#editor").innerHTML="";
     this.querySelector("#mode").onchange=()=>{const mode=this.querySelector("#mode").value;this.querySelector("#phases").style.display=mode==="phased"?"block":"none";this.querySelector("#fixed-dose").style.display=mode==="fixed"?"block":"none";this.querySelector("#fixed-times").style.display=mode==="fixed"?"block":"none";};
     this.querySelector("#add-product").onclick=()=>{const root=this.querySelector("#products");root.insertAdjacentHTML("beforeend",this.productEditor({id:crypto.randomUUID(),name:"",strength_mg:25,splittable:true,stock_batches:[]},root.children.length));};
+    this.querySelector("#add-phase").onclick=()=>this.addPhase();
+    this.querySelector("#remove-phase").onclick=()=>{const root=this.querySelector("#phase-list");if(root.children.length>1)root.lastElementChild.remove();else alert("נדרש לפחות שלב אחד.");};
     this.querySelector("#save").onclick=()=>this.saveMedication(med);
+  }
+  phaseEditor(phase,index) {
+    const weekdays=phase.weekdays||[0,1,2,3,4,5,6];
+    const days=["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"];
+    return `<div class="product phase-row" data-phase-index="${index}">
+      <div class="form">
+        <div><label>תאריך התחלה</label><input class="phase-start" type="date" value="${this.esc(phase.start_date||new Date().toISOString().slice(0,10))}"></div>
+        <div><label>משך השלב בימים (ריק = ללא הגבלה)</label><input class="phase-duration" type="number" min="1" step="1" value="${phase.duration_days??""}" placeholder="ללא הגבלה"></div>
+        <div><label>מינון במ״ג</label><input class="phase-dose" type="number" min="0.5" step="0.5" value="${phase.dose_mg||25}"></div>
+        <div><label>שעות (מופרדות בפסיק)</label><input class="phase-times" value="${this.esc((phase.times||["08:00"]).join(", "))}"></div>
+        <div class="wide"><label>ימי נטילה</label><select class="phase-weekdays" multiple size="2">${days.map((d,i)=>`<option value="${i}" ${weekdays.includes(i)?"selected":""}>${d}</option>`).join("")}</select></div>
+      </div>
+    </div>`;
+  }
+  addPhase() {
+    const root=this.querySelector("#phase-list");
+    const last=root.lastElementChild;
+    const duration=Number(last.querySelector(".phase-duration").value||30);
+    if(!Number.isInteger(duration)||duration<1)return alert("יש להזין משך שלב תקין לפני הוספת שלב נוסף.");
+    const start=last.querySelector(".phase-start").value;
+    if(!start)return alert("יש להזין תאריך התחלה לשלב הנוכחי.");
+    const nextDate=new Date(start+"T00:00:00");
+    nextDate.setDate(nextDate.getDate()+duration);
+    const pad=n=>String(n).padStart(2,"0");
+    const nextStart=nextDate.getFullYear()+"-"+pad(nextDate.getMonth()+1)+"-"+pad(nextDate.getDate());
+    last.querySelector(".phase-duration").value=duration;
+    const selected=[...last.querySelector(".phase-weekdays").selectedOptions].map(o=>Number(o.value));
+    const phase={
+      start_date:nextStart,duration_days:null,
+      dose_mg:Number(last.querySelector(".phase-dose").value||25),
+      times:last.querySelector(".phase-times").value.split(",").map(x=>x.trim()).filter(Boolean),
+      weekdays:selected.length?selected:[0,1,2,3,4,5,6]
+    };
+    root.insertAdjacentHTML("beforeend",this.phaseEditor(phase,root.children.length));
   }
   productEditor(product,index) {
     return `<div class="product" data-product-index="${index}" data-id="${this.esc(product.id||crypto.randomUUID())}">
@@ -170,7 +216,15 @@ class PillManagerPanel extends HTMLElement {
         const times=this.querySelector("#times").value.split(",").map(x=>x.trim()).filter(Boolean);
         regimen={mode:"fixed",fixed_phase:{dose_mg,times,weekdays:[0,1,2,3,4,5,6]}};
       } else if(mode==="phased") {
-        regimen={mode:"phased",phases:JSON.parse(this.querySelector("#phase-json").value)};
+        const rows=[...this.querySelectorAll(".phase-row")];
+        const phases=rows.map(row=>({
+          start_date:row.querySelector(".phase-start").value,
+          duration_days:row.querySelector(".phase-duration").value===""?null:Number(row.querySelector(".phase-duration").value),
+          dose_mg:Number(row.querySelector(".phase-dose").value),
+          times:row.querySelector(".phase-times").value.split(",").map(x=>x.trim()).filter(Boolean),
+          weekdays:[...row.querySelector(".phase-weekdays").selectedOptions].map(o=>Number(o.value))
+        }));
+        regimen={mode:"phased",phases};
       }
       await this.call("save_medication",{medication:{...original,name,products,regimen}});
       await this.load(true);
