@@ -62,7 +62,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     v2_entries = hass.data.get(f"{DOMAIN}_v2", {})
     v2_entries.pop(entry.entry_id, None)
     if not v2_entries:
-        for service in ("take_dose", "skip_dose", "undo_dose", "add_stock"):
+        for service in ("take_dose", "skip_dose", "undo_dose", "add_stock", "adjust_stock"):
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
     return True
