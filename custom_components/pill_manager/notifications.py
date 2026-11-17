@@ -45,6 +45,7 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
             # Native notify entities use notify.send_message. This API accepts
             # title/message only; actionable Companion App buttons require the
             # legacy mobile_app notify service below.
+            message = f"{message} פתח את מנהל התרופות כדי לאשר את הנטילה."
             await hass.services.async_call("notify", "send_message", {
                 "entity_id": notify_entity,
                 "title": title,
