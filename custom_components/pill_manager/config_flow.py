@@ -13,6 +13,7 @@ DEFAULT_OPTIONS = {
     "missed_after_minutes": 120,
     "missed_dose_action": "ask",
     "auto_deduct_stock": False,
+    "notify_entity": "",
     "notify_service": "",
 }
 
@@ -48,14 +49,18 @@ class PillManagerOptionsFlow(config_entries.OptionsFlow):
         # Use the live service registry so users can select a Companion App target
         # without typing a service name or creating a separate automation.
         notify_services = self.hass.services.async_services().get("notify", {})
-        notify_options = [""] + [
+        service_options = [""] + [
             f"notify.{service_name}" for service_name in sorted(notify_services)
+            if service_name.startswith("mobile_app_")
         ]
         selected_service = current.get("notify_service", "")
-        if selected_service and selected_service not in notify_options:
-            # Keep a previously configured target visible if the mobile app is
-            # temporarily unavailable during an options-flow edit.
-            notify_options.append(selected_service)
+        if selected_service and selected_service not in service_options:
+            service_options.append(selected_service)
+
+        entity_options = [""] + sorted(self.hass.states.async_entity_ids("notify"))
+        selected_entity = current.get("notify_entity", "")
+        if selected_entity and selected_entity not in entity_options:
+            entity_options.append(selected_entity)
 
         schema = vol.Schema({
             vol.Required("reminder_repeat_minutes",
@@ -68,7 +73,9 @@ class PillManagerOptionsFlow(config_entries.OptionsFlow):
                          default=current["missed_dose_action"]): vol.In(["ask", "mark_missed"]),
             vol.Required("auto_deduct_stock",
                          default=current["auto_deduct_stock"]): bool,
+            vol.Required("notify_entity",
+                         default=selected_entity): vol.In(entity_options),
             vol.Required("notify_service",
-                         default=selected_service): vol.In(notify_options),
+                         default=selected_service): vol.In(service_options),
         })
         return self.async_show_form(step_id="init", data_schema=schema)
