@@ -7,7 +7,7 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN
+from .const import DOMAIN, EVENT_V2_UPDATED
 from .engine import allocate_dose, consume_allocation, PillManagerError
 
 
@@ -76,6 +76,7 @@ async def async_setup_services(hass: HomeAssistant):
                 "source": call.data.get("source", "manual"),
             })
             await store.async_save()
+        hass.bus.async_fire(EVENT_V2_UPDATED)
         except (KeyError, TypeError, ValueError, PillManagerError) as err:
             raise HomeAssistantError(str(err)) from err
 
@@ -96,6 +97,7 @@ async def async_setup_services(hass: HomeAssistant):
             "updated_at": _parse_iso_datetime(call.data["updated_at"]),
         })
         await store.async_save()
+        hass.bus.async_fire(EVENT_V2_UPDATED)
 
     async def undo_dose(call: ServiceCall):
         store = get_store()
@@ -111,6 +113,7 @@ async def async_setup_services(hass: HomeAssistant):
         consume_allocation(medication["products"], record["allocation"], sign=1)
         record["status"] = "undone"
         await store.async_save()
+        hass.bus.async_fire(EVENT_V2_UPDATED)
 
     async def add_stock(call: ServiceCall):
         store = get_store()
@@ -134,6 +137,7 @@ async def async_setup_services(hass: HomeAssistant):
             "received_at": _parse_received_at(call.data["received_at"]),
         })
         await store.async_save()
+        hass.bus.async_fire(EVENT_V2_UPDATED)
 
     async def adjust_stock(call: ServiceCall):
         store = get_store()
@@ -165,6 +169,7 @@ async def async_setup_services(hass: HomeAssistant):
             "created_at": _parse_iso_datetime(call.data["created_at"]),
         })
         await store.async_save()
+        hass.bus.async_fire(EVENT_V2_UPDATED)
 
     schemas = {
         "take_dose": vol.Schema({
