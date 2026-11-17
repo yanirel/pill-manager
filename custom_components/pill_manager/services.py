@@ -55,8 +55,9 @@ async def async_setup_services(hass: HomeAssistant):
             raise HomeAssistantError("Medication not found")
         try:
             taken_at = _parse_iso_datetime(call.data["taken_at"])
+            taken_on = date.fromisoformat(taken_at[:10])
             dose = float(call.data["actual_dose_mg"])
-            allocation = allocate_dose(medication["products"], dose)
+            allocation = allocate_dose(medication["products"], dose, taken_on)
             # Validate and consume on a working copy so a failed operation cannot
             # leave a partially changed in-memory inventory.
             from copy import deepcopy
