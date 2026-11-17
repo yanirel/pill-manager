@@ -43,6 +43,16 @@ class PillManagerPanel extends HTMLElement {
       <div class="wrap">
         <header><div><h1>ניהול תרופות</h1><div class="muted">ניהול תרופות, אריזות, אצוות מלאי ומשטרי מינון</div></div><button id="new">+ הוספת תרופה</button></header>
         ${this.error ? `<div class="card">${this.esc(this.error)}</div>` : ""}
+        ${(this.data?.occurrences||[]).filter(o=>["pending","missed_pending"].includes(o.status)).length ? `
+          <section class="card" style="margin-bottom:14px">
+            <h2>מנות שממתינות לאישור</h2>
+            ${(this.data.occurrences||[]).filter(o=>["pending","missed_pending"].includes(o.status)).map(o=>`
+              <div class="stock">
+                <div class="line"><strong>${this.esc(o.medication_name||"תרופה")} · ${Number(o.dose_mg||0)} מ״ג</strong><span class="tag ${o.status==="missed_pending"?"warn":""}">${o.status==="missed_pending"?"באיחור":"ממתינה"}</span></div>
+                <div class="muted">מועד מתוכנן: ${this.esc(o.scheduled_at||"—")}</div>
+                <div class="actions"><button data-occ-take="${this.esc(o.occurrence_id)}">לקחתי</button><button class="secondary" data-occ-skip="${this.esc(o.occurrence_id)}">דלג</button></div>
+              </div>`).join("")}
+          </section>` : ""}
         <div class="grid">
           ${medications.map(m => {
             const products = m.products || [];
@@ -68,6 +78,38 @@ class PillManagerPanel extends HTMLElement {
     this.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>this.deleteMedication(b.dataset.delete));
     this.querySelectorAll("[data-stock]").forEach(b=>b.onclick=()=>this.addStock(b.dataset.stock,b.dataset.product));
     this.querySelectorAll("[data-adjust]").forEach(b=>b.onclick=()=>this.adjustStock(b.dataset.adjust,b.dataset.product,b.dataset.batch,b.dataset.quantity));
+    this.querySelectorAll("[data-occ-take]").forEach(b=>b.onclick=()=>this.confirmOccurrence(b.dataset.occTake));
+    this.querySelectorAll("[data-occ-skip]").forEach(b=>b.onclick=()=>this.skipOccurrence(b.dataset.occSkip));
+    const history=(this.data?.intake||[]).filter(x=>x.status==="taken").sort((a,b)=>String(b.taken_at).localeCompare(String(a.taken_at))).slice(0,10);
+    const root=this.querySelector(".wrap");
+    if(history.length){
+      const section=document.createElement("section");
+      section.className="card section";
+      section.innerHTML="<h2>נטילות אחרונות</h2>"+history.map(x=>`<div class="stock line"><span>${this.esc(x.medication_id)} · ${Number(x.actual_dose_mg||0)} מ״ג</span><span class="muted">${this.esc(x.taken_at||"")}</span></div>`).join("");
+      root.appendChild(section);
+    }
+  }
+  async confirmOccurrence(occurrenceId) {
+    const occurrence=(this.data?.occurrences||[]).find(x=>x.occurrence_id===occurrenceId);
+    if(!occurrence)return;
+    try{
+      await this._hass.callService("pill_manager","take_dose",{
+        medication_id:occurrence.medication_id,intake_id:occurrenceId,occurrence_id:occurrenceId,
+        actual_dose_mg:Number(occurrence.dose_mg),scheduled_dose_mg:Number(occurrence.dose_mg),
+        taken_at:new Date().toISOString(),source:"panel"
+      });
+      await this.load(true);
+    }catch(err){alert("לא ניתן לאשר נטילה: "+(err.message||err));}
+  }
+  async skipOccurrence(occurrenceId) {
+    const occurrence=(this.data?.occurrences||[]).find(x=>x.occurrence_id===occurrenceId);
+    if(!occurrence)return;
+    try{
+      await this._hass.callService("pill_manager","skip_dose",{
+        medication_id:occurrence.medication_id,occurrence_id:occurrenceId,updated_at:new Date().toISOString()
+      });
+      await this.load(true);
+    }catch(err){alert("לא ניתן לדלג על המנה: "+(err.message||err));}
   }
   editMedication(existing) {
     const med=existing?JSON.parse(JSON.stringify(existing)):{
