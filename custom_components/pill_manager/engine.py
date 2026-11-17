@@ -143,15 +143,16 @@ def allocate_dose(products: list[dict[str, Any]], target_mg: float,
     dp = {0: (0.0, ())}
     for idx, option in enumerate(options):
         step = option[4]
-        portion_size = option[7]
-        for total, (tablet_equivalents, chosen) in sorted(list(dp.items()), reverse=True):
+        for total, (tablet_count, chosen) in sorted(list(dp.items()), reverse=True):
             new_total = total + step
             candidate = chosen + (idx,)
-            new_score = tablet_equivalents + portion_size
+            # A half-tablet still means handling one physical tablet. Count
+            # tablet portions as tablets, not fractional equivalents.
+            new_score = tablet_count + 1
             if new_total <= target and (
                 new_total not in dp
-                or new_score < dp[new_total][0] - 1e-9
-                or (abs(new_score - dp[new_total][0]) <= 1e-9 and candidate < dp[new_total][1])
+                or new_score < dp[new_total][0]
+                or (new_score == dp[new_total][0] and candidate < dp[new_total][1])
             ):
                 dp[new_total] = (new_score, candidate)
     if target not in dp:
