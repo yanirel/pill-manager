@@ -39,6 +39,12 @@ class PillManagerPanel extends HTMLElement {
     catch (err) { this.error = err.message || String(err); }
     finally {
       this._loading = false;
+      // A refresh can already be in flight when the user opens the editor.
+      // Never replace the panel DOM while the editor is mounted.
+      if (this.querySelector("#editor")?.children.length) {
+        this._refreshPending = true;
+        return;
+      }
       this.render();
       if (this._refreshPending) {
         this._refreshPending = false;
