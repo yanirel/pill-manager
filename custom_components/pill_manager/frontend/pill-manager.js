@@ -122,6 +122,7 @@ class PillManagerPanel extends HTMLElement {
       const section=document.createElement("section");
       section.className="card section";
       section.innerHTML="<h2>נטילות אחרונות</h2>"+history.map(x=>{const med=(this.data.medications||[]).find(m=>m.id===x.medication_id);return `<div class="stock"><div class="line"><span>${this.esc(med?.name||"תרופה")} · ${x.actual_dose_mg==null?"מינון לא ידוע":Number(x.actual_dose_mg)+" מ״ג"} ${x.status==="historical"?"· היסטוריה מיובאת":x.status==="undone"?"· בוטלה":""}</span><span class="muted">${this.esc(x.taken_at||"")}</span></div>${x.status==="taken"?`<div class="actions"><button class="secondary" data-undo="${this.esc(x.id)}">ביטול נטילה</button></div>`:""}</div>`;}).join("");
+      section.querySelectorAll("[data-undo]").forEach(b=>b.onclick=()=>this.undoIntake(b.dataset.undo));
       root.appendChild(section);
     }
   }
