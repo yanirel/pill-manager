@@ -30,6 +30,9 @@ class PillManagerPanel extends HTMLElement {
   }
   async load(force = false) {
     if (!this._hass || (this._loaded && !force)) return;
+    // Never replace the DOM while the user is editing a medication. Reminder
+    // events can arrive while the editor is open and would otherwise erase it.
+    if (force && this.querySelector("#editor")?.children.length) { this._refreshPending = true; return; }
     if (this._loading) { if (force) this._refreshPending = true; return; }
     this._loading = true;
     try { this.data = await this.call("get_data"); this.error = ""; this._loaded = true; }
@@ -173,6 +176,7 @@ class PillManagerPanel extends HTMLElement {
           <div><label>סוג משטר</label><select id="mode"><option value="fixed" ${med.regimen?.mode==="fixed"?"selected":""}>מינון קבוע</option><option value="phased" ${phased?"selected":""}>שלבים מדורגים</option><option value="prn" ${med.regimen?.mode==="prn"?"selected":""}>לפי הצורך (PRN)</option></select></div>
           <div id="fixed-dose"><label>מינון לכל נטילה במ״ג</label><input id="dose" type="number" min="0.5" step="0.5" value="${med.regimen?.fixed_phase?.dose_mg||25}"></div>
           <div id="fixed-times" class="wide"><label>שעות נטילה (מופרדות בפסיק)</label><input id="times" value="${(med.regimen?.fixed_phase?.times||["08:00"]).join(", ")}"></div>
+          <div id="fixed-weekdays" class="wide"><label>ימי נטילה</label><select id="weekdays" multiple size="2">${["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"].map((d,i)=>`<option value="${i}" ${(med.regimen?.fixed_phase?.weekdays||[0,1,2,3,4,5,6]).includes(i)?"selected":""}>${d}</option>`).join("")}</select></div>
         </div>
         <div id="phases" style="display:${phased?"block":"none"}">
           <label>שלבי מינון — השלב האחרון ממשיך עד שתעדכן אותו</label>
@@ -185,7 +189,7 @@ class PillManagerPanel extends HTMLElement {
         <div class="actions"><button id="save">שמירה</button><button class="secondary" id="cancel">ביטול</button></div>
         <div id="form-error" class="muted"></div>
       </section>`;
-    this.querySelector("#cancel").onclick=()=>this.querySelector("#editor").innerHTML="";
+    this.querySelector("#cancel").onclick=()=>{this.querySelector("#editor").innerHTML="";if(this._refreshPending){this._refreshPending=false;this.load(true);}};
     this.querySelector("#mode").onchange=()=>{const mode=this.querySelector("#mode").value;this.querySelector("#phases").style.display=mode==="phased"?"block":"none";this.querySelector("#fixed-dose").style.display=mode==="fixed"?"block":"none";this.querySelector("#fixed-times").style.display=mode==="fixed"?"block":"none";};
     this.querySelector("#add-product").onclick=()=>{const root=this.querySelector("#products");root.insertAdjacentHTML("beforeend",this.productEditor({id:crypto.randomUUID(),name:"",strength_mg:25,splittable:true,stock_batches:[]},root.children.length));};
     this.querySelector("#add-phase").onclick=()=>this.addPhase();
@@ -258,7 +262,9 @@ class PillManagerPanel extends HTMLElement {
       if(mode==="fixed"){
         const dose_mg=Number(this.querySelector("#dose").value);
         const times=this.querySelector("#times").value.split(",").map(x=>x.trim()).filter(Boolean);
-        regimen={mode:"fixed",fixed_phase:{dose_mg,times,weekdays:[0,1,2,3,4,5,6]}};
+        const weekdays=[...this.querySelector("#weekdays").selectedOptions].map(o=>Number(o.value));
+        if(!weekdays.length)throw new Error("יש לבחור לפחות יום נטילה אחד");
+        regimen={mode:"fixed",fixed_phase:{dose_mg,times,weekdays}};
       } else if(mode==="phased") {
         const rows=[...this.querySelectorAll(".phase-row")];
         const phases=rows.map(row=>({
@@ -271,6 +277,8 @@ class PillManagerPanel extends HTMLElement {
         regimen={mode:"phased",phases};
       }
       await this.call("save_medication",{medication:{...original,name,products,regimen}});
+      this.querySelector("#editor").innerHTML="";
+      this._refreshPending=false;
       await this.load(true);
     } catch(err) { error.textContent=err.message||String(err); }
   }
