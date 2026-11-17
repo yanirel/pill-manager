@@ -83,6 +83,11 @@ class EngineTests(unittest.TestCase):
         with self.assertRaises(PillManagerError):
             allocate_dose(products, 25, date(2026, 11, 17))
 
+    def test_invalid_fractional_stock_is_rejected(self):
+        products = [product("fractional", 25, 0.25, "2026-01-01", True)]
+        with self.assertRaises(PillManagerError):
+            allocate_dose(products, 12.5, date(2026, 11, 17))
+
     def test_scheduled_phase_requires_time(self):
         regimen = {"mode": "fixed", "fixed_phase": {"dose_mg": 25, "times": []}}
         with self.assertRaises(PillManagerError):
