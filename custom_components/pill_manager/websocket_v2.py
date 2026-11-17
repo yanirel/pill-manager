@@ -64,18 +64,31 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
         else:
             # A still-active intake may need to be undone later. Do not allow
             # editing away a product or batch referenced by its allocation.
-            protected = set()
+            protected = {}
             for intake in store.data.get("intake", []):
                 if intake.get("medication_id") == medication["id"] and intake.get("status") == "taken":
                     for allocation in intake.get("allocation", []):
-                        protected.add((allocation.get("product_id"), allocation.get("batch_id")))
-            available = {
-                (product.get("id"), batch.get("id"))
-                for product in medication.get("products", [])
-                for batch in product.get("stock_batches", [])
-            }
-            if not protected.issubset(available):
-                raise HomeAssistantError("Cannot remove a product or stock batch referenced by an intake that can still be undone")
+                        key = (allocation.get("product_id"), allocation.get("batch_id"))
+                        old_product = next((p for p in store.data["medications"][existing].get("products", [])
+                                            if p.get("id") == key[0]), None)
+                        old_batch = next((b for b in old_product.get("stock_batches", [])
+                                          if b.get("id") == key[1]), None) if old_product else None
+                        if old_product and old_batch:
+                            protected[key] = (float(old_product["strength_mg"]),
+                                              bool(old_product.get("splittable", False)),
+                                              float(old_batch.get("quantity", 0)))
+            new_products = {p.get("id"): p for p in medication.get("products", [])}
+            for (product_id, batch_id), (old_strength, old_split, old_quantity) in protected.items():
+                new_product = new_products.get(product_id)
+                new_batch = next((b for b in new_product.get("stock_batches", [])
+                                  if b.get("id") == batch_id), None) if new_product else None
+                if (new_product is None or new_batch is None
+                        or float(new_product.get("strength_mg", 0)) != old_strength
+                        or bool(new_product.get("splittable", False)) != old_split
+                        or float(new_batch.get("quantity", 0)) != old_quantity):
+                    raise HomeAssistantError(
+                        "A product or stock batch used by a confirmed intake cannot be changed or removed. Use stock adjustment for quantity corrections."
+                    )
             store.data["medications"][existing] = medication
         await store.async_save()
         hass.bus.async_fire(EVENT_V2_UPDATED)
