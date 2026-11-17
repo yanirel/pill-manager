@@ -97,7 +97,7 @@ def _inventory_units(products, on_date):
                 received_date = date.fromisoformat(str(batch["received_at"])[:10])
                 if received_date > on_date:
                     continue
-            count = int(round(float(batch.get("quantity", 0)) * (2 if splittable else 1)))
+            count = max(0, int(round(float(batch.get("quantity", 0)) * (2 if splittable else 1))))
             received = batch.get("received_at", "")
             for unit_index in range(count):
                 options.append((received, product_index, batch_index, unit_index, step,
