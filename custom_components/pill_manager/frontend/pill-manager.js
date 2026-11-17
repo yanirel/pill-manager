@@ -58,6 +58,35 @@ class PillManagerPanel extends HTMLElement {
     // replace its DOM, even if the panel is temporarily detached/reconnected.
     if (this._editorOpen) { this._refreshPending = true; return; }
     const medications = this.data?.medications || [];
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthLength = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const monthOffset = (monthStart.getDay()+6)%7; // Monday-first, matching Python weekday()
+    const monthLabel = new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(monthStart);
+    const calendarCells = Array.from({length:monthOffset},()=>'<div class="cal-empty"></div>');
+    for(let day=1;day<=monthLength;day++){
+      const date=new Date(now.getFullYear(),now.getMonth(),day);
+      const dateKey=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+      const weekday=(date.getDay()+6)%7;
+      const planned=[];
+      for(const med of medications){
+        const regimen=med.regimen||{};
+        let phase=null;
+        if(regimen.mode==="fixed") phase=regimen.fixed_phase;
+        else if(regimen.mode==="phased") phase=(regimen.phases||[]).find(p=>{
+          if(!p.start_date||p.start_date>dateKey)return false;
+          if(p.duration_days==null)return true;
+          const end=new Date(p.start_date+"T00:00:00");end.setDate(end.getDate()+Number(p.duration_days)-1);
+          const endKey=end.getFullYear()+"-"+String(end.getMonth()+1).padStart(2,"0")+"-"+String(end.getDate()).padStart(2,"0");
+          return dateKey<=endKey;
+        });
+        if(phase&&(phase.weekdays||[0,1,2,3,4,5,6]).includes(weekday)){
+          const times=(phase.times||[]).join(", ");
+          planned.push('<div class="cal-dose">'+this.esc(med.name)+' · '+Number(phase.dose_mg||0)+' מ״ג'+(times?' <span>'+this.esc(times)+'</span>':'')+'</div>');
+        }
+      }
+      calendarCells.push('<div class="cal-day '+(dateKey===this.todayLocal()?'cal-today':'')+'"><strong>'+day+'</strong>'+(planned.length?planned.join(""):'<span class="cal-none">—</span>')+'</div>');
+    }
     this.innerHTML = `
       <style>
         :host{display:block;min-height:100%;background:#f7f8fa;color:#20242b;font-family:Arial,sans-serif;direction:rtl}
@@ -73,6 +102,13 @@ class PillManagerPanel extends HTMLElement {
         .tag{display:inline-block;border-radius:20px;background:#edf5f1;color:#367b68;padding:4px 9px;font-size:12px}
         .warn{background:#fff2dd;color:#94601b}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
         .empty{text-align:center;padding:42px;color:#7b8490}.editor{margin-top:18px}
+        .calendar-card{margin-bottom:16px}.calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+        .cal-head{text-align:center;color:#77818d;font-size:12px;padding:5px 0}
+        .cal-day{min-height:76px;background:#f8faf9;border:1px solid #edf0ee;border-radius:9px;padding:6px;min-width:0}
+        .cal-day>strong{font-size:13px}.cal-today{border:2px solid #367b68;background:#f0f7f3}
+        .cal-dose{font-size:10px;line-height:1.35;margin-top:4px;overflow-wrap:anywhere;color:#315f53}
+        .cal-dose span{display:block;color:#77818d}.cal-none{display:block;color:#c0c5ca;font-size:11px;margin-top:8px}
+        .cal-empty{min-height:76px}@media(max-width:540px){.cal-day{min-height:62px;padding:4px}.cal-dose{font-size:9px}}
         .form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:13px 0}
         label{display:block;font-size:13px;color:#65707c;margin-bottom:5px}
         input,select,textarea{width:100%;padding:10px;border:1px solid #dce1e6;border-radius:9px;font:inherit;background:white;color:#20242b}
@@ -100,6 +136,14 @@ class PillManagerPanel extends HTMLElement {
                 <div class="actions"><button data-occ-take="${this.esc(o.occurrence_id)}">לקחתי</button><button class="secondary" data-occ-skip="${this.esc(o.occurrence_id)}">דלג</button></div>
               </div>`).join("")}
           </section>` : ""}
+
+        <section class="card calendar-card">
+          <div class="line"><h2>לוח הטיפול · ${this.esc(monthLabel)}</h2><span class="muted">התוכנית המתוכננת לכל יום</span></div>
+          <div class="calendar">
+            ${["ב׳","ג׳","ד׳","ה׳","ו׳","ש׳","א׳"].map(d=>'<div class="cal-head">'+d+'</div>').join("")}
+            ${calendarCells.join("")}
+          </div>
+        </section>
         <div class="grid">
           ${medications.map(m => {
             const products = m.products || [];
@@ -186,7 +230,7 @@ class PillManagerPanel extends HTMLElement {
           <div><label>איך לנהל את תוכנית הנטילה?</label><select id="mode"><option value="phased" ${phased?"selected":""}>תקופות ותאריכים</option><option value="fixed" ${med.regimen?.mode==="fixed"?"selected":""}>מינון קבוע ללא תאריך סיום</option><option value="prn" ${med.regimen?.mode==="prn"?"selected":""}>לפי הצורך (PRN)</option></select></div>
           <div id="fixed-dose"><label>מינון לכל נטילה במ״ג</label><input id="dose" type="number" min="0.5" step="0.5" value="${med.regimen?.fixed_phase?.dose_mg||25}"></div>
           <div id="fixed-times" class="wide"><label>שעות נטילה (מופרדות בפסיק)</label><input id="times" value="${(med.regimen?.fixed_phase?.times||["08:00"]).join(", ")}"></div>
-          <div id="fixed-weekdays" class="wide"><label>ימי נטילה</label><select id="weekdays" multiple size="2">${["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"].map((d,i)=>`<option value="${i}" ${(med.regimen?.fixed_phase?.weekdays||[0,1,2,3,4,5,6]).includes(i)?"selected":""}>${d}</option>`).join("")}</select></div>
+          <div id="fixed-weekdays" class="wide"><label>ימי נטילה</label><select id="weekdays" multiple size="2">${["ב׳","ג׳","ד׳","ה׳","ו׳","ש׳","א׳"].map((d,i)=>`<option value="${i}" ${(med.regimen?.fixed_phase?.weekdays||[0,1,2,3,4,5,6]).includes(i)?"selected":""}>${d}</option>`).join("")}</select></div>
         </div>
         <div id="phases" style="display:${phased?"block":"none"}">
           <label>תוכנית לפי תקופות — בחר לכל תקופה תאריך התחלה וסיום, מינון, שעות וימי נטילה. השארת תאריך הסיום ריק פירושה שהתקופה ממשיכה עד שתעדכן אותה.</label>
@@ -208,7 +252,7 @@ class PillManagerPanel extends HTMLElement {
   }
   phaseEditor(phase,index) {
     const weekdays=phase.weekdays||[0,1,2,3,4,5,6];
-    const days=["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"];
+    const days=["ב׳","ג׳","ד׳","ה׳","ו׳","ש׳","א׳"];
     const startDate=phase.start_date||this.todayLocal();
     let endDate="";
     if(phase.duration_days!=null){
