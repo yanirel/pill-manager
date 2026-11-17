@@ -1,37 +1,33 @@
 # Pill Manager
 
-A local-first medication inventory and intake tracker for Home Assistant.
+A local-first Hebrew medication, schedule, intake and inventory manager for Home Assistant.
 
-## Capabilities under development
-- Separate medication, product strength, stock batch, and dose regimen records.
-- Dose tracking in milligrams, with support for combining strengths and half tablets.
-- Fixed, phased/tapered, and as-needed (PRN) regimens.
-- FIFO stock allocation, expiry-aware inventory, and future regimen forecasting.
-- Explicit intake confirmation; automatic stock deduction is off by default.
-- Notifications can target a native `notify.*` entity through `notify.send_message`, or a legacy `notify.mobile_app_*` service.
-- Legacy Companion App service mode supports action buttons (taken / snooze / skip); native notify entities currently support the standard title/message action only.
-- Hebrew standalone Home Assistant sidebar panel.
-- Local persistence in Home Assistant.
+## Features
 
-## Development status
+- Add a medication with multiple product strengths / packages (for example 25 mg and 50 mg).
+- Define the prescribed dose in mg; the engine calculates a compatible combination of available tablets and half-tablets.
+- Fixed schedules or phased regimens with start dates, duration, dose, weekdays and one or more times per day.
+- PRN (as-needed) medications without scheduled reminders.
+- Reminder notifications, repeat / snooze / skip, and explicit intake confirmation.
+- Stock is deducted only after a confirmed intake by default. Automatic scheduled deduction is optional and off by default.
+- FIFO stock allocation, expiry-aware batches, undo of a confirmed intake, audited stock corrections and stock-restock records.
+- Forecast the date stock will run out, including future dose phases.
+- Home Assistant sensors for current dose, remaining stock days and depletion date, plus a due-dose binary sensor and confirmation button.
+- Hebrew Home Assistant sidebar panel.
+- Separate v2 local storage and non-destructive import of supported legacy records.
 
-The active development work is on the `feature/core-v2` branch and in [draft pull request #1](https://github.com/yanirel/pill-manager/pull/1).
+## Install
 
-**This is not a released or installable version.** Pure engine and migration tests are running in CI, and a Home Assistant runtime import check is being added. Full lifecycle tests on a real Home Assistant instance and end-to-end Companion App verification are still required. Do not install this development branch on a production Home Assistant instance yet.
+Install as a custom integration through HACS using this repository:
 
-## Migration safety
+`yanirel/pill-manager`
 
-On first v2 startup, if legacy data exists and the v2 store is empty, the integration copies supported medications and historical intake records into the new store. It never modifies or deletes the legacy store. Imported historical intakes are read-only because their original stock-batch allocation is unknown. Ambiguous, expired, future-dated, or unsupported old schedules are not guessed: the medication is imported as PRN and a warning is shown in the panel so the user can review its regimen. A full legacy backup is retained in the v2 store.
+After installation, restart Home Assistant, add the **Pill Manager** integration under Settings → Devices & services, and open **תרופות** in the sidebar. Configure the notification target in the integration options.
 
-## Development tests
-GitHub Actions runs:
-- Pure dose and inventory engine tests.
-- Non-destructive migration tests.
-- Home Assistant integration module import checks.
-- Python compilation, frontend JavaScript syntax validation, and JSON validation.
+## Important notes
 
-## Data and privacy
-Medication names, regimens, stock, and intake history are stored locally in Home Assistant's `.storage` system. The v2 data store uses the separate key `pill_manager_v2`. Do not put personal medication information in GitHub issues.
-
-## Safety
-Pill Manager is a tracking and reminder aid, not medical advice. It does not recommend or change prescribed doses.
+- Pill Manager is a tracking and reminder aid, not medical advice. It does not recommend or change prescribed doses.
+- Review imported schedules and the initial stock after migration. Ambiguous legacy schedules are imported as PRN rather than guessed.
+- Confirmed intakes reduce stock. Historical imports are read-only where the original stock allocation is unknown.
+- Automated CI checks cover the calculation engine, migration, Python import in the Home Assistant 2026.9.1 runtime, JavaScript syntax and JSON metadata. These checks are not a substitute for verifying notification delivery and the complete workflow on the target Home Assistant installation.
+- Medication names, regimens, stock and intake history are stored locally in Home Assistant. Do not put personal medication information in GitHub issues.
