@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 
 from .const import DOMAIN
 from .models import validate_medication, empty_database
-from .engine import forecast, PillManagerError
+from .engine import forecast, active_phase, PillManagerError
 
 
 def _store(hass: HomeAssistant):
@@ -32,12 +32,14 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
         current_date = dt_util.now().date()
         for medication in data["medications"]:
             try:
+                medication["current_phase"] = active_phase(medication.get("regimen", {}), current_date)
                 medication["forecast"] = forecast(
                     medication.get("products", []),
                     medication.get("regimen", {}),
                     current_date,
                 )
             except (PillManagerError, KeyError, ValueError) as err:
+                medication["current_phase"] = None
                 medication["forecast"] = {"error": str(err)}
         connection.send_result(msg["id"], data)
 
