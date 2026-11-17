@@ -99,24 +99,32 @@ async def async_setup_services(hass: HomeAssistant):
 
     async def skip_dose(call: ServiceCall):
         store = get_store()
+        from copy import deepcopy
+        working = deepcopy(store.data)
         occurrence_id = call.data["occurrence_id"]
         updated_at = _parse_iso_datetime(call.data["updated_at"])
         if any(x.get("occurrence_id") == occurrence_id and x.get("status") == "taken"
-               for x in store.data["intake"]):
+               for x in working["intake"]):
             raise HomeAssistantError("A confirmed intake cannot be marked skipped")
-        existing = next((x for x in store.data["occurrences"]
+        existing = next((x for x in working["occurrences"]
                          if x.get("occurrence_id") == occurrence_id), None)
         if existing:
             existing["status"] = "skipped"
             existing["updated_at"] = updated_at
         else:
-            store.data["occurrences"].append({
+            working["occurrences"].append({
                 "occurrence_id": occurrence_id,
                 "medication_id": call.data["medication_id"],
                 "status": "skipped",
                 "updated_at": updated_at,
             })
-        await store.async_save()
+        previous_data = store.data
+        store.data = working
+        try:
+            await store.async_save()
+        except Exception:
+            store.data = previous_data
+            raise
         hass.bus.async_fire(EVENT_V2_UPDATED)
 
     async def undo_dose(call: ServiceCall):
@@ -209,19 +217,31 @@ async def async_setup_services(hass: HomeAssistant):
         if any(event.get("id") == call.data["event_id"]
                for event in store.data.get("stock_events", [])):
             raise HomeAssistantError("Stock event ID has already been used")
-        before = float(batch.get("quantity", 0))
-        batch["quantity"] = new_quantity
-        store.data.setdefault("stock_events", []).append({
+        created_at = _parse_iso_datetime(call.data["created_at"])
+        from copy import deepcopy
+        working = deepcopy(store.data)
+        working_med = next(m for m in working["medications"] if m["id"] == call.data["medication_id"])
+        working_product = next(p for p in working_med["products"] if p["id"] == call.data["product_id"])
+        working_batch = next(b for b in working_product["stock_batches"] if b["id"] == call.data["batch_id"])
+        before = float(working_batch.get("quantity", 0))
+        working_batch["quantity"] = new_quantity
+        working.setdefault("stock_events", []).append({
             "id": call.data["event_id"],
-            "medication_id": medication["id"],
-            "product_id": product["id"],
-            "batch_id": batch["id"],
+            "medication_id": working_med["id"],
+            "product_id": working_product["id"],
+            "batch_id": working_batch["id"],
             "before": before,
             "after": new_quantity,
             "reason": call.data["reason"],
-            "created_at": _parse_iso_datetime(call.data["created_at"]),
+            "created_at": created_at,
         })
-        await store.async_save()
+        previous_data = store.data
+        store.data = working
+        try:
+            await store.async_save()
+        except Exception:
+            store.data = previous_data
+            raise
         hass.bus.async_fire(EVENT_V2_UPDATED)
 
     schemas = {
