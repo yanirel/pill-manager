@@ -55,7 +55,7 @@ class PillManagerPanel extends HTMLElement {
                 ${(p.stock_batches||[]).map(b=>`<div class="batch">אצווה: ${this.esc(b.quantity)} יח׳ · התקבלה: ${this.esc(b.received_at||"—")} ${b.expires_on?"· תפוגה: "+this.esc(b.expires_on):""}</div>`).join("")}
                 <div class="actions"><button class="secondary" data-stock="${m.id}" data-product="${p.id}">הוספת מלאי</button></div></div>`).join("")}
               <div class="stock"><div class="line"><span>תחזית אזילת מלאי</span><strong>${forecast.depletion_date?this.esc(forecast.depletion_date):forecast.reason==="prn"?"לא מחושבת (לפי הצורך)":forecast.error?"לא זמינה":"מעבר לטווח התחזית"}</strong></div></div>
-              <div class="actions"><button class="secondary" data-edit="${m.id}">עריכה</button><button class="danger" data-delete="${m.id}">מחיקה</button></div>
+              <div class="actions"><button data-take="${m.id}">אישור נטילה</button><button class="secondary" data-edit="${m.id}">עריכה</button><button class="danger" data-delete="${m.id}">מחיקה</button></div>
             </article>`;
           }).join("")}
         </div>
@@ -63,7 +63,7 @@ class PillManagerPanel extends HTMLElement {
         <div id="editor"></div>
       </div>`;
     this.querySelector("#new").onclick=()=>this.editMedication();
-    this.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.edit)));
+    this.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.edit)));\n    this.querySelectorAll("[data-take]").forEach(b=>b.onclick=()=>this.takeMedication(medications.find(m=>m.id===b.dataset.take)));
     this.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>this.deleteMedication(b.dataset.delete));
     this.querySelectorAll("[data-stock]").forEach(b=>b.onclick=()=>this.addStock(b.dataset.stock,b.dataset.product));
   }
