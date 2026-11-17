@@ -31,13 +31,13 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
     notify_target = str(options.get("notify_service", "")).strip()
 
     async def send_notification(occurrence, overdue=False):
-        if not notify_target or "." not in notify_target:
+        if not notify_target.startswith("notify.") or notify_target.count(".") != 1:
             return False
-        domain, service = notify_target.split(".", 1)
-        if not hass.services.has_service(domain, service):
+        service = notify_target.split(".", 1)[1]
+        if not service or not hass.services.has_service("notify", service):
             return False
         occurrence_id = occurrence["occurrence_id"]
-        await hass.services.async_call(domain, service, {
+        await hass.services.async_call("notify", service, {
             "title": "מנה שהגיע הזמן לקחת" if not overdue else "מנה שלא אושרה",
             "message": (
                 f"{occurrence['medication_name']} · {occurrence['dose_mg']:g} מ״ג"
