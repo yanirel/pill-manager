@@ -7,6 +7,10 @@ class PillManagerPanel extends HTMLElement {
   esc(value) {
     return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   }
+  todayLocal() {
+    const d=new Date(), pad=n=>String(n).padStart(2,"0");
+    return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  }
   async load(force = false) {
     if (!this._hass || this._loading || (this._loaded && !force)) return;
     this._loading = true;
@@ -124,7 +128,7 @@ class PillManagerPanel extends HTMLElement {
     };
     const phased=med.regimen?.mode==="phased";
     const phaseDefaults=med.regimen?.phases?.length?med.regimen.phases:[{
-      start_date:new Date().toISOString().slice(0,10),duration_days:null,
+      start_date:this.todayLocal(),duration_days:null,
       dose_mg:med.regimen?.fixed_phase?.dose_mg||25,
       times:med.regimen?.fixed_phase?.times||["08:00"],
       weekdays:med.regimen?.fixed_phase?.weekdays||[0,1,2,3,4,5,6]
@@ -159,7 +163,7 @@ class PillManagerPanel extends HTMLElement {
     const days=["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"];
     return `<div class="phase-row phase-editor" data-phase-index="${index}">
       <div class="form">
-        <div><label>תאריך התחלה</label><input class="phase-start" type="date" value="${this.esc(phase.start_date||new Date().toISOString().slice(0,10))}"></div>
+        <div><label>תאריך התחלה</label><input class="phase-start" type="date" value="${this.esc(phase.start_date||this.todayLocal())}"></div>
         <div><label>משך השלב בימים (ריק = ללא הגבלה)</label><input class="phase-duration" type="number" min="1" step="1" value="${phase.duration_days??""}" placeholder="ללא הגבלה"></div>
         <div><label>מינון במ״ג</label><input class="phase-dose" type="number" min="0.5" step="0.5" value="${phase.dose_mg||25}"></div>
         <div><label>שעות (מופרדות בפסיק)</label><input class="phase-times" value="${this.esc((phase.times||["08:00"]).join(", "))}"></div>
@@ -253,7 +257,7 @@ class PillManagerPanel extends HTMLElement {
     if(quantity===null)return;
     const amount=Number(quantity);
     if(!Number.isFinite(amount)||amount<=0)return alert("יש להזין כמות חיובית");
-    const received=prompt("תאריך קבלה (YYYY-MM-DD)",new Date().toISOString().slice(0,10));
+    const received=prompt("תאריך קבלה (YYYY-MM-DD)",this.todayLocal());
     if(received===null)return;
     const expires=prompt("תאריך תפוגה (YYYY-MM-DD), או להשאיר ריק","");
     if(expires===null)return;
