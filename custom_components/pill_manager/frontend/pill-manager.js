@@ -248,7 +248,7 @@ class PillManagerPanel extends HTMLElement {
         let batches=(original.products||[]).find(p=>p.id===id)?.stock_batches||[];
         const previous=(original.products||[]).find(p=>p.id===id);
         if(previous){const total=batches.reduce((s,b)=>s+Number(b.quantity||0),0);if(Math.abs(total-quantity)>0.0001)throw new Error("לשינוי מלאי קיים השתמש בכפתור „הוספת מלאי”; אין לשנות אותו במסך העריכה.");}
-        else if(quantity>0)batches=[{id:crypto.randomUUID(),quantity,received_at:new Date().toISOString()}];
+        else if(quantity>0)batches=[{id:crypto.randomUUID(),quantity,received_at:this.todayLocal()}];
         return {id,name,strength_mg,splittable,stock_batches:batches};
       });
       if(!products.length)throw new Error("יש להוסיף לפחות מוצר אחד");
