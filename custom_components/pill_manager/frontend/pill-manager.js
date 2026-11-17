@@ -145,7 +145,7 @@ class PillManagerPanel extends HTMLElement {
     this.querySelector("#mode").onchange=()=>{const mode=this.querySelector("#mode").value;this.querySelector("#phases").style.display=mode==="phased"?"block":"none";this.querySelector("#fixed-dose").style.display=mode==="fixed"?"block":"none";this.querySelector("#fixed-times").style.display=mode==="fixed"?"block":"none";};
     this.querySelector("#add-product").onclick=()=>{const root=this.querySelector("#products");root.insertAdjacentHTML("beforeend",this.productEditor({id:crypto.randomUUID(),name:"",strength_mg:25,splittable:true,stock_batches:[]},root.children.length));};
     this.querySelector("#add-phase").onclick=()=>this.addPhase();
-    this.querySelector("#remove-phase").onclick=()=>{const root=this.querySelector("#phase-list");if(root.children.length>1)root.lastElementChild.remove();else alert("נדרש לפחות שלב אחד.");};
+    this.querySelector("#remove-phase").onclick=()=>{const root=this.querySelector("#phase-list");if(root.children.length>1){root.lastElementChild.remove();root.lastElementChild.querySelector(".phase-duration").value="";}else alert("נדרש לפחות שלב אחד.");};
     this.querySelector("#save").onclick=()=>this.saveMedication(med);
   }
   phaseEditor(phase,index) {
