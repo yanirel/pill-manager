@@ -9,10 +9,12 @@ class PillManagerStorage:
         self.data=empty_database()
     async def async_load(self):
         loaded=await self._store.async_load()
-        if isinstance(loaded,dict) and loaded.get("schema_version")==2:
-            self.data=loaded
+        if isinstance(loaded, dict) and loaded.get("schema_version") == 2:
+            defaults = empty_database()
+            defaults.update(loaded)
+            self.data = defaults
         else:
-            self.data=empty_database()
+            self.data = empty_database()
     async def async_save(self):
         await self._store.async_save(self.data)
     def snapshot(self):
