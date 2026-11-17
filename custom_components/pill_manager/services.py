@@ -120,14 +120,16 @@ async def async_setup_services(hass: HomeAssistant):
 
     async def undo_dose(call: ServiceCall):
         store = get_store()
-        record = next((x for x in store.data["intake"] if x["id"] == call.data["intake_id"]), None)
+        from copy import deepcopy
+        working = deepcopy(store.data)
+        record = next((x for x in working["intake"] if x["id"] == call.data["intake_id"]), None)
         if record is None:
             raise HomeAssistantError("Intake record not found")
         if record.get("status") == "undone":
             return
         if record.get("source") == "legacy_import" or not record.get("allocation"):
             raise HomeAssistantError("Imported historical records cannot be undone because their original batch allocation is unknown")
-        medication = next((m for m in store.data["medications"]
+        medication = next((m for m in working["medications"]
                            if m["id"] == record["medication_id"]), None)
         if medication is None:
             raise HomeAssistantError("Medication not found")
@@ -135,12 +137,18 @@ async def async_setup_services(hass: HomeAssistant):
         record["status"] = "undone"
         occurrence_id = record.get("occurrence_id")
         if occurrence_id:
-            occurrence = next((item for item in store.data["occurrences"]
+            occurrence = next((item for item in working["occurrences"]
                                if item.get("occurrence_id") == occurrence_id), None)
             if occurrence:
                 occurrence["status"] = "pending"
                 occurrence["updated_at"] = dt_util.now().isoformat()
-        await store.async_save()
+        previous_data = store.data
+        store.data = working
+        try:
+            await store.async_save()
+        except Exception:
+            store.data = previous_data
+            raise
         hass.bus.async_fire(EVENT_V2_UPDATED)
 
     async def add_stock(call: ServiceCall):
