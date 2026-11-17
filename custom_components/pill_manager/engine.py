@@ -70,15 +70,15 @@ def _validate_phase_schedule(phase: dict[str, Any]) -> None:
     if dose <= 0 or abs(dose * 2 - round(dose * 2)) > 1e-7:
         raise PillManagerError("Dose must be positive and representable to 0.5 mg")
     times = phase.get("times", [])
-    if not isinstance(times, list):
-        raise PillManagerError("times must be a list")
+    if not isinstance(times, list) or not times:
+        raise PillManagerError("Every scheduled phase needs at least one time")
     for value in times:
         try:
             datetime.strptime(value, "%H:%M")
         except (TypeError, ValueError) as err:
             raise PillManagerError("Times must use HH:MM format") from err
     weekdays = phase.get("weekdays", list(range(7)))
-    if any(not isinstance(day, int) or day < 0 or day > 6 for day in weekdays):
+    if not weekdays or any(not isinstance(day, int) or day < 0 or day > 6 for day in weekdays):
         raise PillManagerError("weekdays must contain values from 0 to 6")
 
 
