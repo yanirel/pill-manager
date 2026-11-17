@@ -20,7 +20,8 @@
           "missed_after_minutes": "סימון כמנה שהוחמצה לאחר (דקות)",
           "missed_dose_action": "מה לעשות כשמנה מתעכבת",
           "auto_deduct_stock": "הפחתת מלאי אוטומטית לפי לוח הזמנים",
-          "notify_service": "יעד התראות (שירות notify של Home Assistant)"
+          "notify_entity": "ישות התראות (התראה רגילה)",
+          "notify_service": "שירות mobile_app ישן (כולל כפתורי פעולה)"
         }
       }
     }
