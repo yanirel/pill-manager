@@ -12,6 +12,20 @@ from .const import DOMAIN, EVENT_V2_UPDATED
 from .engine import active_phase, forecast, PillManagerError
 
 
+def _get_forecast(store, medication):
+    """Cache the comparatively expensive forecast until data changes or the date rolls over."""
+    today = dt_util.now().date()
+    cache = getattr(store, "_pill_manager_forecast_cache", {})
+    key = (medication["id"], today)
+    if key not in cache:
+        try:
+            cache[key] = forecast(medication.get("products", []), medication.get("regimen", {}), today)
+        except (PillManagerError, KeyError, ValueError) as err:
+            cache[key] = {"error": str(err)}
+        store._pill_manager_forecast_cache = cache
+    return cache[key]
+
+
 class PillManagerSensor(SensorEntity):
     """A read-only status sensor for one medication."""
 
@@ -37,10 +51,8 @@ class PillManagerSensor(SensorEntity):
         if self.kind == "current_dose":
             phase = active_phase(medication.get("regimen", {}), dt_util.now().date())
             return phase.get("dose_mg") if phase else None
-        try:
-            result = forecast(medication.get("products", []),
-                              medication.get("regimen", {}), dt_util.now().date())
-        except (PillManagerError, KeyError, ValueError):
+        result = _get_forecast(self.store, medication)
+        if result.get("error"):
             return None
         if self.kind == "remaining_days":
             return result.get("days_remaining")
@@ -55,11 +67,7 @@ class PillManagerSensor(SensorEntity):
         if medication is None:
             return {}
         if self.kind == "depletion_date":
-            try:
-                return forecast(medication.get("products", []),
-                                medication.get("regimen", {}), dt_util.now().date())
-            except (PillManagerError, KeyError, ValueError) as err:
-                return {"forecast_error": str(err)}
+            return _get_forecast(self.store, medication)
         return {"medication_id": self.medication_id, "medication": medication["name"]}
 
 
@@ -97,6 +105,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     @callback
     def handle_update(_event):
+        store._pill_manager_forecast_cache = {}
         add_missing()
         for entity in all_entities:
             entity.async_write_ha_state()
