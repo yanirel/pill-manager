@@ -82,8 +82,8 @@ def import_legacy_data(legacy_data, v2_data):
             except (TypeError, ValueError):
                 quantity = 0
             if abs(quantity - round(quantity)) > 1e-7:
-                warnings.append(f"{old.get('name', 'תרופה')}: מלאי לא שלם בחוזק {strength_text!r}; נדרש תיקון ידני.")
-                quantity = max(0, int(quantity))
+                warnings.append(f"{old.get('name', 'תרופה')}: מלאי לא שלם בחוזק {strength_text!r}; הכמות יובאה כאפס כדי לא להציג מלאי שגוי. יש לתקן ידנית.")
+                quantity = 0
             product_id = uuid4().hex
             strength_map[strength_text] = strength
             products.append({
