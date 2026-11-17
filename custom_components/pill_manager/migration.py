@@ -50,9 +50,13 @@ def _legacy_regimen(schedules, strength_map):
     if dose_mg <= 0:
         return {"mode": "prn"}, "לא נמצא מינון חד-משמעי בלוח הישן; נדרש להגדיר משטר מחדש."
     times = schedule.get("times") or ([schedule["time"]] if schedule.get("time") else [])
+    if isinstance(times, str):
+        times = [times]
     if not times:
         return {"mode": "prn"}, "לא נמצאו שעות נטילה בלוח הישן; נדרש להגדיר משטר מחדש."
     weekdays = schedule.get("weekdays", list(range(7)))
+    if not isinstance(weekdays, list) or any(not isinstance(day, int) or day < 0 or day > 6 for day in weekdays):
+        return {"mode": "prn"}, "ימי השבוע בלוח הישן אינם בפורמט מוכר; נדרש להגדיר משטר מחדש."
     return {
         "mode": "fixed",
         "fixed_phase": {
@@ -120,8 +124,15 @@ def import_legacy_data(legacy_data, v2_data):
         try:
             validate_medication(medication)
         except (PillManagerError, TypeError, ValueError) as err:
-            warnings.append(f"{medication['name']}: לא יובאה אוטומטית ({err}).")
-            continue
+            # Preserve the medication and inventory, but never activate an
+            # unverified legacy schedule.
+            medication["regimen"] = {"mode": "prn"}
+            warnings.append(f"{medication['name']}: לוח המינון הישן לא אומת ({err}); התרופה יובאה כ'לפי הצורך' לבדיקה.")
+            try:
+                validate_medication(medication)
+            except (PillManagerError, TypeError, ValueError) as final_err:
+                warnings.append(f"{medication['name']}: לא יובאה אוטומטית ({final_err}).")
+                continue
         v2_data["medications"].append(medication)
         imported_ids[old.get("id")] = medication["id"]
 
