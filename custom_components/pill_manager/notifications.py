@@ -158,14 +158,15 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
                     continue
                 if last_sent and now - last_sent < timedelta(minutes=repeat):
                     continue
+                if mark is None:
+                    mark = {"occurrence_id": occurrence_id}
+                    store.data["reminder_marks"].append(mark)
+                    changed = True
                 try:
                     sent = await send_notification(occurrence, overdue)
                 except Exception:  # A notification failure must not stop future reminders.
                     sent = False
                 if sent:
-                    if mark is None:
-                        mark = {"occurrence_id": occurrence_id}
-                        store.data["reminder_marks"].append(mark)
                     mark["last_sent"] = now.isoformat()
                     changed = True
         if changed:
