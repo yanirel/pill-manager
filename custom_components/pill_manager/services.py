@@ -76,7 +76,7 @@ async def async_setup_services(hass: HomeAssistant):
                 "source": call.data.get("source", "manual"),
             })
             await store.async_save()
-        hass.bus.async_fire(EVENT_V2_UPDATED)
+            hass.bus.async_fire(EVENT_V2_UPDATED)
         except (KeyError, TypeError, ValueError, PillManagerError) as err:
             raise HomeAssistantError(str(err)) from err
 
