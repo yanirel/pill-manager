@@ -150,8 +150,6 @@ async def async_setup_services(hass: HomeAssistant):
         if batch is None:
             raise HomeAssistantError("Stock batch not found")
         new_quantity = float(call.data["quantity"])
-        if new_quantity < 0:
-            raise HomeAssistantError("Stock quantity cannot be negative")
         if not product.get("splittable", False) and not new_quantity.is_integer():
             raise HomeAssistantError("Non-splittable stock must be a whole number")
         before = float(batch.get("quantity", 0))
