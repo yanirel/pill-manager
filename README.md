@@ -6,11 +6,13 @@ A local-first Hebrew medication, schedule, intake and inventory manager for Home
 
 - Add a medication with multiple product strengths / packages (for example 25 mg and 50 mg).
 - Define the prescribed dose in mg; the engine calculates a compatible combination of available tablets and half-tablets.
-- Fixed schedules or phased regimens with start dates, duration, dose, weekdays and one or more times per day.
+- A monthly treatment calendar with navigable months.
+- Define date-range treatment periods (including gaps), each with its own dose, weekdays and one or more times per day.
+- Fixed schedules or PRN (as-needed) medications.
 - PRN (as-needed) medications without scheduled reminders.
 - Reminder notifications, repeat / snooze / skip, and explicit intake confirmation.
 - Stock is deducted only after a confirmed intake by default. Automatic scheduled deduction is optional and off by default.
-- FIFO stock allocation, expiry-aware batches, undo of a confirmed intake, audited stock corrections and stock-restock records.
+- Strength-specific inventory shown per package, quick addition of another strength, FIFO stock allocation, expiry-aware batches, undo of a confirmed intake, audited stock corrections and stock-restock records.
 - Forecast the date stock will run out, including future dose phases.
 - Home Assistant sensors for current dose, remaining stock days and depletion date, plus a due-dose binary sensor and confirmation button.
 - Hebrew Home Assistant sidebar panel.
