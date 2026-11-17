@@ -52,7 +52,7 @@ class PillManagerPanel extends HTMLElement {
               <div class="line"><h2>${this.esc(m.name)}</h2><span class="tag">${m.regimen?.mode==="prn"?"לפי הצורך":m.regimen?.mode==="phased"?"משטר מדורג":"מינון קבוע"}</span></div>
               <div class="muted">סה״כ ${products.length} סוגי מוצר · ${units.toFixed(1)} יחידות במלאי</div>
               ${products.map(p=>`<div class="stock"><div class="line"><strong>${this.esc(p.name||"מוצר")} · ${p.strength_mg} מ״ג</strong><span>${p.splittable?"ניתן לחצייה":"שלם בלבד"}</span></div>
-                ${(p.stock_batches||[]).map(b=>`<div class="batch">אצווה: ${this.esc(b.quantity)} יח׳ · התקבלה: ${this.esc(b.received_at||"—")} ${b.expires_on?"· תפוגה: "+this.esc(b.expires_on):""}</div>`).join("")}
+                ${(p.stock_batches||[]).map(b=>`<div class="batch ${Number(b.quantity)<0?"warn":""}">אצווה: ${this.esc(b.quantity)} יח׳ ${Number(b.quantity)<0?"· יתרת מלאי שלילית — נדרשת בדיקה":""} · התקבלה: ${this.esc(b.received_at||"—")} ${b.expires_on?"· תפוגה: "+this.esc(b.expires_on):""}</div>`).join("")}
                 <div class="actions"><button class="secondary" data-stock="${m.id}" data-product="${p.id}">הוספת מלאי</button></div></div>`).join("")}
               <div class="stock"><div class="line"><span>תחזית אזילת מלאי</span><strong>${forecast.depletion_date?this.esc(forecast.depletion_date):forecast.reason==="prn"?"לא מחושבת (לפי הצורך)":forecast.error?"לא זמינה":"מעבר לטווח התחזית"}</strong></div></div>
               <div class="actions"><button data-take="${m.id}">אישור נטילה</button><button class="secondary" data-edit="${m.id}">עריכה</button><button class="danger" data-delete="${m.id}">מחיקה</button></div>
