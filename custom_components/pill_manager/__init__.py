@@ -15,6 +15,7 @@ from .services import async_setup_services
 from .websocket import async_setup_websocket
 from .websocket_v2 import async_setup_v2_websocket
 from .notifications import async_setup_reminders
+from .migration import import_legacy_data
 
 PLATFORMS: list[str] = ["sensor", "binary_sensor", "button"]
 
@@ -36,6 +37,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # the existing pill_manager storage used by the first-generation panel.
     v2_store = PillManagerStorage(hass)
     await v2_store.async_load()
+    if (legacy_store.data.get("medications") or legacy_store.data.get("intake")) and not v2_store.data.get("migration", {}).get("legacy_v1_imported"):
+        if import_legacy_data(legacy_store.data, v2_store.data):
+            await v2_store.async_save()
     hass.data.setdefault(f"{DOMAIN}_v2", {})[entry.entry_id] = v2_store
     await async_setup_services(hass)
     await async_setup_reminders(hass, entry, v2_store)
