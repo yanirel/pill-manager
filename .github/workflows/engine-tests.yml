@@ -13,3 +13,13 @@ jobs:
           python-version: "3.12"
       - name: Run pure engine tests
         run: python -m unittest discover -s tests -v
+      - name: Compile integration Python files
+        run: python -m compileall -q custom_components/pill_manager
+      - name: Check frontend JavaScript syntax
+        run: node --check custom_components/pill_manager/frontend/pill-manager.js
+      - name: Validate integration JSON
+        run: |
+          python -m json.tool custom_components/pill_manager/manifest.json > /dev/null
+          python -m json.tool custom_components/pill_manager/strings.json > /dev/null
+          python -m json.tool custom_components/pill_manager/translations/he.json > /dev/null
+          python -m json.tool hacs.json > /dev/null
