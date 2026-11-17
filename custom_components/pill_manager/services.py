@@ -89,13 +89,15 @@ async def async_setup_services(hass: HomeAssistant):
         existing = next((x for x in store.data["occurrences"]
                          if x.get("occurrence_id") == occurrence_id), None)
         if existing:
-            return
-        store.data["occurrences"].append({
-            "occurrence_id": occurrence_id,
-            "medication_id": call.data["medication_id"],
-            "status": "skipped",
-            "updated_at": _parse_iso_datetime(call.data["updated_at"]),
-        })
+            existing["status"] = "skipped"
+            existing["updated_at"] = _parse_iso_datetime(call.data["updated_at"])
+        else:
+            store.data["occurrences"].append({
+                "occurrence_id": occurrence_id,
+                "medication_id": call.data["medication_id"],
+                "status": "skipped",
+                "updated_at": _parse_iso_datetime(call.data["updated_at"]),
+            })
         await store.async_save()
         hass.bus.async_fire(EVENT_V2_UPDATED)
 
