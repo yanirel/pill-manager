@@ -60,4 +60,5 @@ def empty_database():
         "intake": [],
         "occurrences": [],
         "stock_events": [],
+        "reminder_marks": [],
     }
