@@ -7,6 +7,7 @@ import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, EVENT_V2_UPDATED
 from .engine import allocate_dose, consume_allocation, PillManagerError
@@ -129,9 +130,7 @@ async def async_setup_services(hass: HomeAssistant):
                                if item.get("occurrence_id") == occurrence_id), None)
             if occurrence:
                 occurrence["status"] = "pending"
-                occurrence["updated_at"] = _parse_iso_datetime(
-                    call.data.get("undone_at") or __import__("homeassistant.util.dt", fromlist=["now"]).now().isoformat()
-                )
+                occurrence["updated_at"] = dt_util.now().isoformat()
         await store.async_save()
         hass.bus.async_fire(EVENT_V2_UPDATED)
 
