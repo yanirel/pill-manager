@@ -90,12 +90,13 @@ class PillManagerPanel extends HTMLElement {
     this.querySelectorAll("[data-adjust]").forEach(b=>b.onclick=()=>this.adjustStock(b.dataset.adjust,b.dataset.product,b.dataset.batch,b.dataset.quantity));
     this.querySelectorAll("[data-occ-take]").forEach(b=>b.onclick=()=>this.confirmOccurrence(b.dataset.occTake));
     this.querySelectorAll("[data-occ-skip]").forEach(b=>b.onclick=()=>this.skipOccurrence(b.dataset.occSkip));
+    this.querySelectorAll("[data-undo]").forEach(b=>b.onclick=()=>this.undoIntake(b.dataset.undo));
     const history=(this.data?.intake||[]).filter(x=>["taken","historical"].includes(x.status)).sort((a,b)=>String(b.taken_at).localeCompare(String(a.taken_at))).slice(0,10);
     const root=this.querySelector(".wrap");
     if(history.length){
       const section=document.createElement("section");
       section.className="card section";
-      section.innerHTML="<h2>נטילות אחרונות</h2>"+history.map(x=>{const med=(this.data.medications||[]).find(m=>m.id===x.medication_id);return `<div class="stock line"><span>${this.esc(med?.name||"תרופה")} · ${x.actual_dose_mg==null?"מינון לא ידוע":Number(x.actual_dose_mg)+" מ״ג"} ${x.status==="historical"?"· היסטוריה מיובאת":""}</span><span class="muted">${this.esc(x.taken_at||"")}</span></div>`;}).join("");
+      section.innerHTML="<h2>נטילות אחרונות</h2>"+history.map(x=>{const med=(this.data.medications||[]).find(m=>m.id===x.medication_id);return `<div class="stock"><div class="line"><span>${this.esc(med?.name||"תרופה")} · ${x.actual_dose_mg==null?"מינון לא ידוע":Number(x.actual_dose_mg)+" מ״ג"} ${x.status==="historical"?"· היסטוריה מיובאת":""}</span><span class="muted">${this.esc(x.taken_at||"")}</span></div>${x.status==="taken"?`<div class="actions"><button class="secondary" data-undo="${this.esc(x.id)}">ביטול נטילה</button></div>`:""}</div>`;}).join("");
       root.appendChild(section);
     }
   }
@@ -110,6 +111,13 @@ class PillManagerPanel extends HTMLElement {
       });
       await this.load(true);
     }catch(err){alert("לא ניתן לאשר נטילה: "+(err.message||err));}
+  }
+  async undoIntake(intakeId) {
+    if(!confirm("לבטל את רישום הנטילה ולהחזיר את הכמות למלאי?"))return;
+    try{
+      await this._hass.callService("pill_manager","undo_dose",{intake_id:intakeId});
+      await this.load(true);
+    }catch(err){alert("לא ניתן לבטל את הנטילה: "+(err.message||err));}
   }
   async skipOccurrence(occurrenceId) {
     const occurrence=(this.data?.occurrences||[]).find(x=>x.occurrence_id===occurrenceId);
