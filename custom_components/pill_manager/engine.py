@@ -177,13 +177,23 @@ def consume_allocation(products, allocation, sign=-1):
         batch["quantity"] = quantity
 
 
-def forecast(products, regimen, start: date, max_days=3650):
-    """Simulate future scheduled doses across phases and report batch depletion."""
+def forecast(products, regimen, start: date, max_days=3650, medication_id=None,
+             intake_records=None, occurrences=None):
+    """Simulate future doses, excluding today's already handled occurrences."""
+
     validate_regimen(regimen)
     if regimen.get("mode", "fixed") == "prn":
         return {"depletion_date": None, "days_remaining": None,
                 "batch_depletion_dates": {}, "reason": "prn"}
     stock = deepcopy(products)
+    handled_today = {
+        item.get("occurrence_id") for item in (intake_records or [])
+        if item.get("status") == "taken" and item.get("occurrence_id")
+    }
+    handled_today.update(
+        item.get("occurrence_id") for item in (occurrences or [])
+        if item.get("status") in ("skipped", "missed") and item.get("occurrence_id")
+    )
     batch_dates = {(p["id"], b["id"]): None
                    for p in stock for b in p.get("stock_batches", [])}
     for offset in range(max_days):
@@ -192,6 +202,10 @@ def forecast(products, regimen, start: date, max_days=3650):
         if not phase or day.weekday() not in phase.get("weekdays", list(range(7))):
             continue
         for _time in phase.get("times", []):
+            if offset == 0 and medication_id:
+                occurrence_id = f"{medication_id}:{day.isoformat()}:{_time}"
+                if occurrence_id in handled_today:
+                    continue
             try:
                 allocation = allocate_dose(stock, float(phase["dose_mg"]), day)
             except PillManagerError:
