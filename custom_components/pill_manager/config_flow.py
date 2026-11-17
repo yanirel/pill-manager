@@ -20,7 +20,7 @@ DEFAULT_OPTIONS = {
 class PillManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Set up Pill Manager."""
 
-    VERSION = 2
+    VERSION = 1
 
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Create the single local instance."""
