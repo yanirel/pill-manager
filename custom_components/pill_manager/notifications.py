@@ -93,6 +93,10 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
                             "updated_at": now.isoformat(),
                         })
                         changed = True
+                    elif occurrence.get("status") != "missed":
+                        occurrence["status"] = "missed"
+                        occurrence["updated_at"] = now.isoformat()
+                        changed = True
                     continue
                 status = "missed_pending" if overdue else "pending"
                 if occurrence is None:
