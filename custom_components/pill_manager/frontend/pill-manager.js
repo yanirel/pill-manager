@@ -29,11 +29,19 @@ class PillManagerPanel extends HTMLElement {
     return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
   }
   async load(force = false) {
-    if (!this._hass || this._loading || (this._loaded && !force)) return;
+    if (!this._hass || (this._loaded && !force)) return;
+    if (this._loading) { if (force) this._refreshPending = true; return; }
     this._loading = true;
     try { this.data = await this.call("get_data"); this.error = ""; this._loaded = true; }
     catch (err) { this.error = err.message || String(err); }
-    finally { this._loading = false; this.render(); }
+    finally {
+      this._loading = false;
+      this.render();
+      if (this._refreshPending) {
+        this._refreshPending = false;
+        this.load(true);
+      }
+    }
   }
   render() {
     if (!this._hass) return;
