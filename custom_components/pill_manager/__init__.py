@@ -42,10 +42,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
-    frontend_dir = Path(__file__).parent / "frontend"
-    await hass.http.async_register_static_paths([
-        StaticPathConfig("/pill_manager_static", str(frontend_dir), False)
-    ])
+    if not hass.data.get(f"{DOMAIN}_static_registered"):
+        frontend_dir = Path(__file__).parent / "frontend"
+        await hass.http.async_register_static_paths([
+            StaticPathConfig("/pill_manager_static", str(frontend_dir), False)
+        ])
+        hass.data[f"{DOMAIN}_static_registered"] = True
     await panel_custom.async_register_panel(
         hass,
         webcomponent_name="pill-manager-panel",
