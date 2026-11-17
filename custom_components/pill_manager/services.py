@@ -78,6 +78,12 @@ async def async_setup_services(hass: HomeAssistant):
                 "status": "taken",
                 "source": call.data.get("source", "manual"),
             })
+            if occurrence_id:
+                occurrence = next((item for item in store.data["occurrences"]
+                                   if item.get("occurrence_id") == occurrence_id), None)
+                if occurrence:
+                    occurrence["status"] = "taken"
+                    occurrence["updated_at"] = taken_at
             await store.async_save()
             hass.bus.async_fire(EVENT_V2_UPDATED)
         except (KeyError, TypeError, ValueError, PillManagerError) as err:
@@ -117,6 +123,15 @@ async def async_setup_services(hass: HomeAssistant):
             raise HomeAssistantError("Medication not found")
         consume_allocation(medication["products"], record["allocation"], sign=1)
         record["status"] = "undone"
+        occurrence_id = record.get("occurrence_id")
+        if occurrence_id:
+            occurrence = next((item for item in store.data["occurrences"]
+                               if item.get("occurrence_id") == occurrence_id), None)
+            if occurrence:
+                occurrence["status"] = "pending"
+                occurrence["updated_at"] = _parse_iso_datetime(
+                    call.data.get("undone_at") or __import__("homeassistant.util.dt", fromlist=["now"]).now().isoformat()
+                )
         await store.async_save()
         hass.bus.async_fire(EVENT_V2_UPDATED)
 
