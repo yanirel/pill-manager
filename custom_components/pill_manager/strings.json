@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Pill Manager",
+        "description": "Add the local medication, inventory and intake manager."
+      }
+    },
+    "abort": {
+      "already_configured": "Pill Manager is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Reminder and inventory settings",
+        "description": "Choose reminder intervals and stock handling.",
+        "data": {
+          "reminder_repeat_minutes": "Repeat reminder every (minutes)",
+          "missed_after_minutes": "Mark as missed after (minutes)",
+          "missed_dose_action": "When a dose is overdue",
+          "auto_deduct_stock": "Automatically deduct stock on schedule"
+        }
+      }
+    }
+  }
+}
