@@ -107,7 +107,7 @@ def _inventory_units(products, on_date):
 
 def allocate_dose(products: list[dict[str, Any]], target_mg: float,
                   on_date: date | None = None) -> list[dict[str, Any]]:
-    """Find an exact dose, minimizing tablet portions and then preferring FIFO."""
+    """Find an exact dose, preferring oldest received stock before portion count."""
     if target_mg <= 0 or abs(target_mg * 2 - round(target_mg * 2)) > 1e-7:
         raise PillManagerError("Dose must be positive and representable to 0.5 mg")
     target = int(round(target_mg * 2))
@@ -118,8 +118,9 @@ def allocate_dose(products: list[dict[str, Any]], target_mg: float,
         step = option[4]
         for total, (count, chosen) in sorted(list(dp.items()), reverse=True):
             new_total = total + step
-            if new_total <= target and (new_total not in dp or count + 1 < dp[new_total][0]):
-                dp[new_total] = (count + 1, chosen + (idx,))
+            candidate = chosen + (idx,)
+            if new_total <= target and (new_total not in dp or candidate < dp[new_total][1]):
+                dp[new_total] = (count + 1, candidate)
     if target not in dp:
         raise PillManagerError(f"Insufficient compatible stock for {target_mg:g} mg")
     grouped = {}
