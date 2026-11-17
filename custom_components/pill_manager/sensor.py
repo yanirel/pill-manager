@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.util import dt as dt_util
@@ -67,6 +67,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     """Create and dynamically add medication sensors."""
     store = hass.data[f"{DOMAIN}_v2"][entry.entry_id]
     added: set[str] = set()
+    all_entities = []
 
     @callback
     def add_missing():
@@ -85,8 +86,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 entity._attr_native_unit_of_measurement = unit
                 entity._attr_device_class = device_class
                 if kind in ("remaining_days", "current_dose"):
-                    entity._attr_state_class = "measurement"
+                    entity._attr_state_class = SensorStateClass.MEASUREMENT
                 entities.append(entity)
+                all_entities.append(entity)
                 added.add(key)
         if entities:
             async_add_entities(entities)
@@ -96,19 +98,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     @callback
     def handle_update(_event):
         add_missing()
-        for entity in getattr(hass, "data", {}).get(f"{DOMAIN}_sensor_entities_{entry.entry_id}", []):
+        for entity in all_entities:
             entity.async_write_ha_state()
 
-    # Keep entity references so updates can refresh them after stock or regimen changes.
-    # async_add_entities owns entity lifecycle; we register the listener in the entry data.
-    hass.data.setdefault(f"{DOMAIN}_sensor_entities_{entry.entry_id}", [])
-    original_add = async_add_entities
-
-    def add_and_track(entities):
-        entities = list(entities)
-        hass.data[f"{DOMAIN}_sensor_entities_{entry.entry_id}"].extend(entities)
-        original_add(entities)
-
-    # Initial entities were already submitted above; subsequent ones are tracked.
     unsub = hass.bus.async_listen(EVENT_V2_UPDATED, handle_update)
     hass.data.setdefault(f"{DOMAIN}_unsubscribers", {})[entry.entry_id] = [unsub]
