@@ -63,7 +63,8 @@ class PillManagerPanel extends HTMLElement {
         <div id="editor"></div>
       </div>`;
     this.querySelector("#new").onclick=()=>this.editMedication();
-    this.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.edit)));\n    this.querySelectorAll("[data-take]").forEach(b=>b.onclick=()=>this.takeMedication(medications.find(m=>m.id===b.dataset.take)));
+    this.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.edit)));
+    this.querySelectorAll("[data-take]").forEach(b=>b.onclick=()=>this.takeMedication(medications.find(m=>m.id===b.dataset.take)));
     this.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>this.deleteMedication(b.dataset.delete));
     this.querySelectorAll("[data-stock]").forEach(b=>b.onclick=()=>this.addStock(b.dataset.stock,b.dataset.product));
   }
