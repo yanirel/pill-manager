@@ -19,7 +19,8 @@
           "reminder_repeat_minutes": "חזרה על תזכורת כל (דקות)",
           "missed_after_minutes": "סימון כמנה שהוחמצה לאחר (דקות)",
           "missed_dose_action": "מה לעשות כשמנה מתעכבת",
-          "auto_deduct_stock": "הפחתת מלאי אוטומטית לפי לוח הזמנים"
+          "auto_deduct_stock": "הפחתת מלאי אוטומטית לפי לוח הזמנים",
+          "notify_service": "שירות התראות של Companion App (לדוגמה notify.mobile_app_phone)"
         }
       }
     }
