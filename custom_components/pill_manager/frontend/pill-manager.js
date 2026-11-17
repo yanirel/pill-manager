@@ -43,6 +43,12 @@ class PillManagerPanel extends HTMLElement {
       <div class="wrap">
         <header><div><h1>ניהול תרופות</h1><div class="muted">ניהול תרופות, אריזות, אצוות מלאי ומשטרי מינון</div></div><button id="new">+ הוספת תרופה</button></header>
         ${this.error ? `<div class="card">${this.esc(this.error)}</div>` : ""}
+        ${this.data?.migration?.legacy_v1_imported ? `
+          <section class="card" style="margin-bottom:14px">
+            <h2>ייבוא נתונים מהגרסה הקודמת הושלם</h2>
+            <div class="muted">יובאו ${Number(this.data.migration.imported_medications||0)} תרופות ו-${Number(this.data.migration.imported_history_records||0)} רשומות היסטוריה. הנתונים המקוריים נשמרו ללא שינוי.</div>
+            ${(this.data.migration.warnings||[]).map(w=>`<div class="batch warn">${this.esc(w)}</div>`).join("")}
+          </section>` : ""}
         ${(this.data?.occurrences||[]).filter(o=>["pending","missed_pending"].includes(o.status)).length ? `
           <section class="card" style="margin-bottom:14px">
             <h2>מנות שממתינות לאישור</h2>
@@ -80,12 +86,12 @@ class PillManagerPanel extends HTMLElement {
     this.querySelectorAll("[data-adjust]").forEach(b=>b.onclick=()=>this.adjustStock(b.dataset.adjust,b.dataset.product,b.dataset.batch,b.dataset.quantity));
     this.querySelectorAll("[data-occ-take]").forEach(b=>b.onclick=()=>this.confirmOccurrence(b.dataset.occTake));
     this.querySelectorAll("[data-occ-skip]").forEach(b=>b.onclick=()=>this.skipOccurrence(b.dataset.occSkip));
-    const history=(this.data?.intake||[]).filter(x=>x.status==="taken").sort((a,b)=>String(b.taken_at).localeCompare(String(a.taken_at))).slice(0,10);
+    const history=(this.data?.intake||[]).filter(x=>["taken","historical"].includes(x.status)).sort((a,b)=>String(b.taken_at).localeCompare(String(a.taken_at))).slice(0,10);
     const root=this.querySelector(".wrap");
     if(history.length){
       const section=document.createElement("section");
       section.className="card section";
-      section.innerHTML="<h2>נטילות אחרונות</h2>"+history.map(x=>{const med=(this.data.medications||[]).find(m=>m.id===x.medication_id);return `<div class="stock line"><span>${this.esc(med?.name||"תרופה")} · ${Number(x.actual_dose_mg||0)} מ״ג</span><span class="muted">${this.esc(x.taken_at||"")}</span></div>`;}).join("");
+      section.innerHTML="<h2>נטילות אחרונות</h2>"+history.map(x=>{const med=(this.data.medications||[]).find(m=>m.id===x.medication_id);return `<div class="stock line"><span>${this.esc(med?.name||"תרופה")} · ${x.actual_dose_mg==null?"מינון לא ידוע":Number(x.actual_dose_mg)+" מ״ג"} ${x.status==="historical"?"· היסטוריה מיובאת":""}</span><span class="muted">${this.esc(x.taken_at||"")}</span></div>`;}).join("");
       root.appendChild(section);
     }
   }
