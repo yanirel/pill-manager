@@ -105,6 +105,8 @@ def _inventory_units(products, on_date):
     for product_index, product in enumerate(products):
         splittable = bool(product.get("splittable", False))
         strength = float(product["strength_mg"])
+        if splittable and abs(strength - round(strength)) > 1e-7:
+            raise PillManagerError("A splittable tablet must have a whole-mg strength for 0.5 mg dose precision")
         step = int(round(strength if splittable else strength * 2))
         if step <= 0:
             continue
