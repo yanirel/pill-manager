@@ -1,7 +1,7 @@
 """Public Home Assistant services for medication inventory and intake."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -19,6 +19,14 @@ def _parse_iso_datetime(value: str) -> str:
     if parsed.tzinfo is None:
         raise HomeAssistantError("Datetime values must include a timezone")
     return parsed.isoformat()
+
+
+def _parse_received_at(value: str) -> str:
+    # Inventory batches may be recorded with a date only or a full zoned timestamp.
+    try:
+        return date.fromisoformat(value).isoformat()
+    except (TypeError, ValueError):
+        return _parse_iso_datetime(value)
 
 
 async def async_setup_services(hass: HomeAssistant):
@@ -122,7 +130,7 @@ async def async_setup_services(hass: HomeAssistant):
             "id": call.data["batch_id"],
             "quantity": quantity,
             "expires_on": call.data.get("expires_on"),
-            "received_at": _parse_iso_datetime(call.data["received_at"]),
+            "received_at": _parse_received_at(call.data["received_at"]),
         })
         await store.async_save()
 
