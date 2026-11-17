@@ -26,6 +26,12 @@ def _legacy_regimen(schedules, strength_map):
     if len(schedules or []) != 1:
         return {"mode": "prn"}, "לוח המינון הישן לא ניתן להמרה חד-משמעית; הוגדר 'לפי הצורך' עד לבדיקה."
     schedule = schedules[0]
+    if schedule.get("start_date"):
+        try:
+            if date.fromisoformat(schedule["start_date"]) > date.today():
+                return {"mode": "prn"}, "לוח המינון הישן מתחיל בעתיד; הוגדר 'לפי הצורך' עד לבדיקה."
+        except (TypeError, ValueError):
+            return {"mode": "prn"}, "תאריך תחילת לוח המינון הישן אינו תקין; הוגדר 'לפי הצורך' עד לבדיקה."
     if schedule.get("end_date"):
         return {"mode": "prn"}, "לוח המינון הישן מוגבל בזמן; הוגדר 'לפי הצורך' כדי לא להמציא מינון לאחר סיומו."
     doses = schedule.get("doses") or {}
