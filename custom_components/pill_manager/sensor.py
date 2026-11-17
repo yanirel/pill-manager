@@ -111,4 +111,4 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             entity.async_write_ha_state()
 
     unsub = hass.bus.async_listen(EVENT_V2_UPDATED, handle_update)
-    hass.data.setdefault(f"{DOMAIN}_unsubscribers", {})[entry.entry_id] = [unsub]
+    hass.data.setdefault(f"{DOMAIN}_unsubscribers", {}).setdefault(entry.entry_id, []).append(unsub)
