@@ -100,6 +100,7 @@ async def async_setup_services(hass: HomeAssistant):
     async def skip_dose(call: ServiceCall):
         store = get_store()
         occurrence_id = call.data["occurrence_id"]
+        updated_at = _parse_iso_datetime(call.data["updated_at"])
         if any(x.get("occurrence_id") == occurrence_id and x.get("status") == "taken"
                for x in store.data["intake"]):
             raise HomeAssistantError("A confirmed intake cannot be marked skipped")
@@ -107,13 +108,13 @@ async def async_setup_services(hass: HomeAssistant):
                          if x.get("occurrence_id") == occurrence_id), None)
         if existing:
             existing["status"] = "skipped"
-            existing["updated_at"] = _parse_iso_datetime(call.data["updated_at"])
+            existing["updated_at"] = updated_at
         else:
             store.data["occurrences"].append({
                 "occurrence_id": occurrence_id,
                 "medication_id": call.data["medication_id"],
                 "status": "skipped",
-                "updated_at": _parse_iso_datetime(call.data["updated_at"]),
+                "updated_at": updated_at,
             })
         await store.async_save()
         hass.bus.async_fire(EVENT_V2_UPDATED)
