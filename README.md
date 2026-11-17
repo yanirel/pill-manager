@@ -8,7 +8,8 @@ A local-first medication inventory and intake tracker for Home Assistant.
 - Fixed, phased/tapered, and as-needed (PRN) regimens.
 - FIFO stock allocation, expiry-aware inventory, and future regimen forecasting.
 - Explicit intake confirmation; automatic stock deduction is off by default.
-- Actionable Home Assistant Companion App notifications through a selectable `notify.*` service.
+- Notifications can target a native `notify.*` entity through `notify.send_message`, or a legacy `notify.mobile_app_*` service.
+- Legacy Companion App service mode supports action buttons (taken / snooze / skip); native notify entities currently support the standard title/message action only.
 - Hebrew standalone Home Assistant sidebar panel.
 - Local persistence in Home Assistant.
 
