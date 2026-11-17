@@ -300,9 +300,6 @@ class PillManagerPanel extends HTMLElement {
   async takeMedication(medication) {
     if (!medication) return;
     const phase = medication.current_phase;
-    if (medication.regimen?.mode !== "prn" && !phase) {
-      return alert("אין משטר מינון פעיל לתאריך הנוכחי.");
-    }
     const plannedDose = phase?.dose_mg;
     const entered = prompt(
       phase ? "המינון המתוכנן הוא "+plannedDose+" מ״ג. אפשר לשנות כאן רק עבור הנטילה הזו; המשטר לא ישתנה." : "כמה מ״ג נלקחו בפועל?",
@@ -313,27 +310,38 @@ class PillManagerPanel extends HTMLElement {
     if (!Number.isFinite(dose) || dose <= 0 || Math.abs(dose*2-Math.round(dose*2))>1e-7) {
       return alert("יש להזין מינון חיובי בכפולות של 0.5 מ״ג.");
     }
+
     const now = new Date();
     const pad = value => String(value).padStart(2, "0");
-    const dateKey = now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
-    const clock = pad(now.getHours())+":"+pad(now.getMinutes());
-    const dueTime = (phase?.times || []).filter(t => t <= clock).sort().reverse()
+    const localDate = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+    const localTime = d => pad(d.getHours())+":"+pad(d.getMinutes());
+    const enteredAt = prompt("תאריך ושעת הנטילה (YYYY-MM-DDTHH:MM). אפשר להשאיר את הזמן הנוכחי.",localDate(now)+"T"+localTime(now));
+    if (enteredAt === null) return;
+    const takenAt = new Date(enteredAt);
+    if (Number.isNaN(takenAt.getTime()) || takenAt.getTime() > now.getTime()) {
+      return alert("יש להזין תאריך ושעה תקינים שאינם בעתיד.");
+    }
+
+    const dateKey = localDate(takenAt);
+    const clock = localTime(takenAt);
+    const isToday = dateKey === localDate(now);
+    const dueTime = isToday ? (phase?.times || []).filter(t => t <= clock).sort().reverse()
       .find(t => {
         const id = medication.id + ":" + dateKey + ":" + t;
         return !(this.data?.intake || []).some(x => x.occurrence_id === id && x.status === "taken")
           && !(this.data?.occurrences || []).some(x => x.occurrence_id === id && ["skipped","missed"].includes(x.status));
-      });
-    const occurrence = dueTime ? medication.id + ":" + dateKey + ":" + dueTime
-      : "panel:" + medication.id + ":" + dateKey + ":" + clock;
+      }) : null;
+    const occurrence = dueTime ? medication.id + ":" + dateKey + ":" + dueTime : null;
+    const intakeId = occurrence || "manual:" + medication.id + ":" + takenAt.getTime();
     try {
       await this._hass.callService("pill_manager", "take_dose", {
         medication_id: medication.id,
-        intake_id: occurrence,
-        occurrence_id: occurrence,
-        actual_dose_mg: Number(dose),
-        ...(phase?.dose_mg != null ? {scheduled_dose_mg: phase.dose_mg} : {}),
-        taken_at: now.toISOString(),
-        source: "panel"
+        intake_id: intakeId,
+        ...(occurrence ? {occurrence_id: occurrence} : {}),
+        actual_dose_mg: dose,
+        ...(isToday && phase?.dose_mg != null ? {scheduled_dose_mg: phase.dose_mg} : {}),
+        taken_at: takenAt.toISOString(),
+        source: isToday ? "panel" : "backdated_panel"
       });
       await this.load(true);
     } catch (err) {
