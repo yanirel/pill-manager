@@ -8,7 +8,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
-from .const import DOMAIN
+from .const import DOMAIN, EVENT_V2_UPDATED
 from .models import validate_medication, empty_database
 from .engine import forecast, active_phase, PillManagerError
 
@@ -60,6 +60,7 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
         else:
             store.data["medications"][existing] = medication
         await store.async_save()
+        hass.bus.async_fire(EVENT_V2_UPDATED)
         connection.send_result(msg["id"], medication)
 
     @websocket_api.websocket_command({
@@ -77,6 +78,7 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
             item for item in store.data["medications"] if item["id"] != med_id
         ]
         await store.async_save()
+        hass.bus.async_fire(EVENT_V2_UPDATED)
         connection.send_result(msg["id"], {})
 
     @websocket_api.websocket_command({
@@ -105,6 +107,7 @@ def async_setup_v2_websocket(hass: HomeAssistant) -> None:
         product.setdefault("stock_batches", []).append(batch)
         validate_medication(med)
         await store.async_save()
+        hass.bus.async_fire(EVENT_V2_UPDATED)
         connection.send_result(msg["id"], batch)
 
     for handler in (get_data, save_medication, delete_medication, add_stock):
