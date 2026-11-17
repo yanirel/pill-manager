@@ -22,6 +22,8 @@ def validate_medication(med):
             raise PillManagerError("Product strength_mg must be numeric") from err
         if strength <= 0 or abs(strength * 2 - round(strength * 2)) > 1e-7:
             raise PillManagerError("Product strength_mg must be positive and use 0.5 mg increments")
+        if product.get("splittable", False) and abs(strength - round(strength)) > 1e-7:
+            raise PillManagerError("A splittable tablet must have a whole-mg strength so half tablets remain in 0.5 mg increments")
 
         for batch in product.get("stock_batches", []):
             batch_id = batch.get("id")
