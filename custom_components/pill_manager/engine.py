@@ -51,11 +51,16 @@ def validate_regimen(regimen: dict[str, Any]) -> None:
     if not phases:
         raise PillManagerError("A phased regimen needs at least one phase")
     previous_end = None
+    previous_open = False
     for index, phase in enumerate(phases):
         try:
             start = date.fromisoformat(phase["start_date"])
         except (KeyError, TypeError, ValueError) as err:
             raise PillManagerError("Every phase needs a valid start_date") from err
+        if previous_open:
+            raise PillManagerError("An open-ended phase must be the final phase")
+        if previous_end is not None and start <= previous_end:
+            raise PillManagerError("Treatment periods cannot overlap")
         try:
             dose = float(phase.get("dose_mg", 0))
         except (TypeError, ValueError) as err:
@@ -63,8 +68,6 @@ def validate_regimen(regimen: dict[str, Any]) -> None:
         if dose <= 0:
             raise PillManagerError("Every phase needs a positive dose_mg")
         duration = phase.get("duration_days")
-        if index < len(phases) - 1 and duration is None:
-            raise PillManagerError("Only the final phase may be open-ended")
         if duration is not None:
             try:
                 duration = int(duration)
@@ -72,12 +75,9 @@ def validate_regimen(regimen: dict[str, Any]) -> None:
                 raise PillManagerError("duration_days must be a positive integer") from err
             if duration < 1:
                 raise PillManagerError("duration_days must be positive")
-        if previous_end is not None and start != previous_end + timedelta(days=1):
-            raise PillManagerError("Phases must be consecutive with no gaps or overlaps")
+        previous_open = duration is None
         previous_end = start + timedelta(days=duration - 1) if duration is not None else None
         _validate_phase_schedule(phase)
-    if phases[-1].get("duration_days") is not None:
-        raise PillManagerError("The final phase must be open-ended")
 
 
 def _validate_phase_schedule(phase: dict[str, Any]) -> None:
@@ -137,18 +137,27 @@ def allocate_dose(products: list[dict[str, Any]], target_mg: float,
         raise PillManagerError("Dose must be positive and representable to 0.5 mg")
     target = int(round(target_mg * 2))
     options = _inventory_units(products, on_date)
-    # 0/1 subset-sum: each physical half/full tablet portion can be used once.
-    # Prefer the fewest whole-tablet equivalents (e.g. 50 + 25 over 25 + 25 + 25),
-    # then use FIFO order as the tie-breaker so older stock is consumed first.
-    dp = {0: (0.0, ())}
+    # 0/1 subset-sum: each half/full tablet portion can be used once.
+    # Score distinct physical tablets, not portions: using both halves of one
+    # tablet is still one tablet, and using one half is also one tablet.
+    # FIFO order breaks ties after minimizing the number of physical tablets.
+    def physical_tablet_count(indices):
+        physical = set()
+        for option_index in indices:
+            option = options[option_index]
+            product_index, batch_index, unit_index = option[1], option[2], option[3]
+            is_split = bool(option[5].get("splittable", False))
+            physical_index = unit_index // 2 if is_split else unit_index
+            physical.add((product_index, batch_index, physical_index))
+        return len(physical)
+
+    dp = {0: (0, ())}
     for idx, option in enumerate(options):
         step = option[4]
-        for total, (tablet_count, chosen) in sorted(list(dp.items()), reverse=True):
+        for total, (_tablet_count, chosen) in sorted(list(dp.items()), reverse=True):
             new_total = total + step
             candidate = chosen + (idx,)
-            # A half-tablet still means handling one physical tablet. Count
-            # tablet portions as tablets, not fractional equivalents.
-            new_score = tablet_count + 1
+            new_score = physical_tablet_count(candidate)
             if new_total <= target and (
                 new_total not in dp
                 or new_score < dp[new_total][0]

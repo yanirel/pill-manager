@@ -32,7 +32,7 @@ class PillManagerPanel extends HTMLElement {
     if (!this._hass || (this._loaded && !force)) return;
     // Never replace the DOM while the user is editing a medication. Reminder
     // events can arrive while the editor is open and would otherwise erase it.
-    if (force && this.querySelector("#editor")?.children.length) { this._refreshPending = true; return; }
+    if (force && this._editorOpen) { this._refreshPending = true; return; }
     if (this._loading) { if (force) this._refreshPending = true; return; }
     this._loading = true;
     try { this.data = await this.call("get_data"); this.error = ""; this._loaded = true; }
@@ -41,7 +41,7 @@ class PillManagerPanel extends HTMLElement {
       this._loading = false;
       // A refresh can already be in flight when the user opens the editor.
       // Never replace the panel DOM while the editor is mounted.
-      if (this.querySelector("#editor")?.children.length) {
+      if (this._editorOpen) {
         this._refreshPending = true;
         return;
       }
@@ -54,7 +54,39 @@ class PillManagerPanel extends HTMLElement {
   }
   render() {
     if (!this._hass) return;
+    // The editor owns its draft state. A reminder/event refresh must never
+    // replace its DOM, even if the panel is temporarily detached/reconnected.
+    if (this._editorOpen) { this._refreshPending = true; return; }
     const medications = this.data?.medications || [];
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth()+(this._calendarOffset||0), 1);
+    const monthLength = new Date(monthStart.getFullYear(), monthStart.getMonth()+1, 0).getDate();
+    const monthOffset = (monthStart.getDay()+6)%7; // Monday-first, matching Python weekday()
+    const monthLabel = new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(monthStart);
+    const calendarCells = Array.from({length:monthOffset},()=>'<div class="cal-empty"></div>');
+    for(let day=1;day<=monthLength;day++){
+      const date=new Date(monthStart.getFullYear(),monthStart.getMonth(),day);
+      const dateKey=monthStart.getFullYear()+"-"+String(monthStart.getMonth()+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+      const weekday=(date.getDay()+6)%7;
+      const planned=[];
+      for(const med of medications){
+        const regimen=med.regimen||{};
+        let phase=null;
+        if(regimen.mode==="fixed") phase=regimen.fixed_phase;
+        else if(regimen.mode==="phased") phase=(regimen.phases||[]).find(p=>{
+          if(!p.start_date||p.start_date>dateKey)return false;
+          if(p.duration_days==null)return true;
+          const end=new Date(p.start_date+"T00:00:00");end.setDate(end.getDate()+Number(p.duration_days)-1);
+          const endKey=end.getFullYear()+"-"+String(end.getMonth()+1).padStart(2,"0")+"-"+String(end.getDate()).padStart(2,"0");
+          return dateKey<=endKey;
+        });
+        if(phase&&(phase.weekdays||[0,1,2,3,4,5,6]).includes(weekday)){
+          const times=(phase.times||[]).join(", ");
+          planned.push('<div class="cal-dose">'+this.esc(med.name)+' · '+Number(phase.dose_mg||0)+' מ״ג'+(times?' <span>'+this.esc(times)+'</span>':'')+'</div>');
+        }
+      }
+      calendarCells.push('<div class="cal-day '+(dateKey===this.todayLocal()?'cal-today':'')+'"><strong>'+day+'</strong>'+(planned.length?planned.join(""):'<span class="cal-none">—</span>')+'</div>');
+    }
     this.innerHTML = `
       <style>
         :host{display:block;min-height:100%;background:#f7f8fa;color:#20242b;font-family:Arial,sans-serif;direction:rtl}
@@ -70,6 +102,13 @@ class PillManagerPanel extends HTMLElement {
         .tag{display:inline-block;border-radius:20px;background:#edf5f1;color:#367b68;padding:4px 9px;font-size:12px}
         .warn{background:#fff2dd;color:#94601b}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
         .empty{text-align:center;padding:42px;color:#7b8490}.editor{margin-top:18px}
+        .calendar-card{margin-bottom:16px}.calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+        .cal-head{text-align:center;color:#77818d;font-size:12px;padding:5px 0}
+        .cal-day{min-height:76px;background:#f8faf9;border:1px solid #edf0ee;border-radius:9px;padding:6px;min-width:0}
+        .cal-day>strong{font-size:13px}.cal-today{border:2px solid #367b68;background:#f0f7f3}
+        .cal-dose{font-size:10px;line-height:1.35;margin-top:4px;overflow-wrap:anywhere;color:#315f53}
+        .cal-dose span{display:block;color:#77818d}.cal-none{display:block;color:#c0c5ca;font-size:11px;margin-top:8px}
+        .cal-empty{min-height:76px}@media(max-width:540px){.cal-day{min-height:62px;padding:4px}.cal-dose{font-size:9px}}
         .form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:13px 0}
         label{display:block;font-size:13px;color:#65707c;margin-bottom:5px}
         input,select,textarea{width:100%;padding:10px;border:1px solid #dce1e6;border-radius:9px;font:inherit;background:white;color:#20242b}
@@ -97,6 +136,14 @@ class PillManagerPanel extends HTMLElement {
                 <div class="actions"><button data-occ-take="${this.esc(o.occurrence_id)}">לקחתי</button><button class="secondary" data-occ-skip="${this.esc(o.occurrence_id)}">דלג</button></div>
               </div>`).join("")}
           </section>` : ""}
+
+        <section class="card calendar-card">
+          <div class="line"><h2>לוח הטיפול · ${this.esc(monthLabel)}</h2><div class="actions"><button class="secondary" id="cal-prev">‹ חודש קודם</button><button class="secondary" id="cal-next">חודש הבא ›</button></div></div>
+          <div class="calendar">
+            ${["ב׳","ג׳","ד׳","ה׳","ו׳","ש׳","א׳"].map(d=>'<div class="cal-head">'+d+'</div>').join("")}
+            ${calendarCells.join("")}
+          </div>
+        </section>
         <div class="grid">
           ${medications.map(m => {
             const products = m.products || [];
@@ -105,11 +152,15 @@ class PillManagerPanel extends HTMLElement {
             return `<article class="card">
               <div class="line"><h2>${this.esc(m.name)}</h2><span class="tag">${m.regimen?.mode==="prn"?"לפי הצורך":m.regimen?.mode==="phased"?"משטר מדורג":"מינון קבוע"}</span></div>
               <div class="muted">סה״כ ${products.length} סוגי מוצר · ${units.toFixed(1)} יחידות במלאי</div>
-              ${products.map(p=>`<div class="stock"><div class="line"><strong>${this.esc(p.name||"מוצר")} · ${p.strength_mg} מ״ג</strong><span>${p.splittable?"ניתן לחצייה":"שלם בלבד"}</span></div>
-                ${(p.stock_batches||[]).map(b=>`<div class="batch ${Number(b.quantity)<0?"warn":""}">אצווה: ${this.esc(b.quantity)} יח׳ ${Number(b.quantity)<0?"· יתרת מלאי שלילית — נדרשת בדיקה":""} · התקבלה: ${this.esc(b.received_at||"—")} ${b.expires_on?"· תפוגה: "+this.esc(b.expires_on):""} <button class="secondary" data-adjust="${m.id}" data-product="${p.id}" data-batch="${b.id}" data-quantity="${b.quantity}">תיקון יתרה</button></div>`).join("")}
-                <div class="actions"><button class="secondary" data-stock="${m.id}" data-product="${p.id}">הוספת מלאי</button></div></div>`).join("")}
+              ${products.map(p=>{
+                const pUnits=(p.stock_batches||[]).reduce((sum,b)=>sum+Number(b.quantity||0),0);
+                return `<div class="stock"><div class="line"><strong>${this.esc(p.name||"אריזה")} · ${p.strength_mg} מ״ג</strong><span>${pUnits} טבליות במלאי</span></div>
+                  <div class="muted">${p.splittable?"ניתן לחצייה":"טבליות שלמות בלבד"}</div>
+                  ${(p.stock_batches||[]).map(b=>`<div class="batch ${Number(b.quantity)<0?"warn":""}">אצווה: ${this.esc(b.quantity)} יח׳ ${Number(b.quantity)<0?"· יתרת מלאי שלילית — נדרשת בדיקה":""} · התקבלה: ${this.esc(b.received_at||"—")} ${b.expires_on?"· תפוגה: "+this.esc(b.expires_on):""} <button class="secondary" data-adjust="${m.id}" data-product="${p.id}" data-batch="${b.id}" data-quantity="${b.quantity}">תיקון יתרה</button></div>`).join("")}
+                  <div class="actions"><button class="secondary" data-stock="${m.id}" data-product="${p.id}">הוספת מלאי לחוזק הזה</button></div></div>`;
+              }).join("")}
               <div class="stock"><div class="line"><span>תחזית אזילת מלאי</span><strong>${forecast.depletion_date?this.esc(forecast.depletion_date):forecast.reason==="prn"?"לא מחושבת (לפי הצורך)":forecast.error?"לא זמינה":"מעבר לטווח התחזית"}</strong></div></div>
-              <div class="actions"><button data-take="${m.id}">אישור נטילה</button><button class="secondary" data-edit="${m.id}">עריכה</button><button class="danger" data-delete="${m.id}">מחיקה</button></div>
+              <div class="actions"><button data-take="${m.id}">אישור נטילה</button><button class="secondary" data-add-strength="${m.id}">+ הוספת חוזק</button><button class="secondary" data-edit="${m.id}">עריכת תרופה</button><button class="danger" data-delete="${m.id}">מחיקה</button></div>
             </article>`;
           }).join("")}
         </div>
@@ -117,7 +168,10 @@ class PillManagerPanel extends HTMLElement {
         <div id="editor"></div>
       </div>`;
     this.querySelector("#new").onclick=()=>this.editMedication();
+    this.querySelector("#cal-prev").onclick=()=>{this._calendarOffset=(this._calendarOffset||0)-1;this.render();};
+    this.querySelector("#cal-next").onclick=()=>{this._calendarOffset=(this._calendarOffset||0)+1;this.render();};
     this.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.edit)));
+    this.querySelectorAll("[data-add-strength]").forEach(b=>b.onclick=()=>this.editMedication(medications.find(m=>m.id===b.dataset.addStrength),true));
     this.querySelectorAll("[data-take]").forEach(b=>b.onclick=()=>this.takeMedication(medications.find(m=>m.id===b.dataset.take)));
     this.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>this.deleteMedication(b.dataset.delete));
     this.querySelectorAll("[data-stock]").forEach(b=>b.onclick=()=>this.addStock(b.dataset.stock,b.dataset.product));
@@ -164,10 +218,11 @@ class PillManagerPanel extends HTMLElement {
       await this.load(true);
     }catch(err){alert("לא ניתן לדלג על המנה: "+(err.message||err));}
   }
-  editMedication(existing) {
+  editMedication(existing, addStrength = false) {
+    this._editorOpen = true;
     const med=existing?JSON.parse(JSON.stringify(existing)):{
       name:"",products:[{id:crypto.randomUUID(),name:"",strength_mg:25,splittable:true,stock_batches:[]}],
-      regimen:{mode:"fixed",fixed_phase:{dose_mg:25,times:["08:00"],weekdays:[0,1,2,3,4,5,6]}}
+      regimen:{mode:"phased",phases:[{start_date:this.todayLocal(),duration_days:null,dose_mg:25,times:["08:00"],weekdays:[0,1,2,3,4,5,6]}]}
     };
     const phased=med.regimen?.mode==="phased";
     const phaseDefaults=med.regimen?.phases?.length?med.regimen.phases:[{
@@ -179,54 +234,67 @@ class PillManagerPanel extends HTMLElement {
     this.querySelector("#editor").innerHTML=`
       <section class="card editor"><h2>${existing?"עריכת תרופה":"הוספת תרופה"}</h2>
         <div class="form"><div class="wide"><label>שם התרופה</label><input id="med-name" value="${this.esc(med.name)}" placeholder="לדוגמה: תרופה"></div>
-          <div><label>סוג משטר</label><select id="mode"><option value="fixed" ${med.regimen?.mode==="fixed"?"selected":""}>מינון קבוע</option><option value="phased" ${phased?"selected":""}>שלבים מדורגים</option><option value="prn" ${med.regimen?.mode==="prn"?"selected":""}>לפי הצורך (PRN)</option></select></div>
+          <div><label>איך לנהל את תוכנית הנטילה?</label><select id="mode"><option value="phased" ${phased?"selected":""}>תקופות ותאריכים</option><option value="fixed" ${med.regimen?.mode==="fixed"?"selected":""}>מינון קבוע ללא תאריך סיום</option><option value="prn" ${med.regimen?.mode==="prn"?"selected":""}>לפי הצורך (PRN)</option></select></div>
           <div id="fixed-dose"><label>מינון לכל נטילה במ״ג</label><input id="dose" type="number" min="0.5" step="0.5" value="${med.regimen?.fixed_phase?.dose_mg||25}"></div>
           <div id="fixed-times" class="wide"><label>שעות נטילה (מופרדות בפסיק)</label><input id="times" value="${(med.regimen?.fixed_phase?.times||["08:00"]).join(", ")}"></div>
-          <div id="fixed-weekdays" class="wide"><label>ימי נטילה</label><select id="weekdays" multiple size="2">${["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"].map((d,i)=>`<option value="${i}" ${(med.regimen?.fixed_phase?.weekdays||[0,1,2,3,4,5,6]).includes(i)?"selected":""}>${d}</option>`).join("")}</select></div>
+          <div id="fixed-weekdays" class="wide"><label>ימי נטילה</label><select id="weekdays" multiple size="2">${["ב׳","ג׳","ד׳","ה׳","ו׳","ש׳","א׳"].map((d,i)=>`<option value="${i}" ${(med.regimen?.fixed_phase?.weekdays||[0,1,2,3,4,5,6]).includes(i)?"selected":""}>${d}</option>`).join("")}</select></div>
         </div>
         <div id="phases" style="display:${phased?"block":"none"}">
-          <label>שלבי מינון — השלב האחרון ממשיך עד שתעדכן אותו</label>
+          <label>תוכנית לפי תקופות — בחר לכל תקופה תאריך התחלה וסיום, מינון, שעות וימי נטילה. השארת תאריך הסיום ריק פירושה שהתקופה ממשיכה עד שתעדכן אותה.</label>
           <div id="phase-list">${phaseDefaults.map((p,i)=>this.phaseEditor(p,i)).join("")}</div>
           <div class="actions"><button class="secondary" id="add-phase">+ הוספת שלב</button><button class="secondary" id="remove-phase">הסרת השלב האחרון</button></div>
-          <div class="muted">השלבים חייבים להיות רצופים. משך שלב נמדד בימים, ושעות וימי נטילה מוגדרים לכל שלב בנפרד.</div>
+          <div class="muted">אפשר להגדיר תקופות נפרדות עם הפסקות ביניהן, אך לא תקופות חופפות. שעות וימי נטילה מוגדרים לכל תקופה בנפרד.</div>
         </div>
-        <h2 class="section">מוצרים וחוזקים</h2><div id="products">${med.products.map((p,i)=>this.productEditor(p,i)).join("")}</div>
-        <div class="actions"><button class="secondary" id="add-product">+ הוספת חוזק / מוצר</button></div>
+        <h2 class="section">מינונים ומלאי לפי אריזה</h2><div id="products">${med.products.map((p,i)=>this.productEditor(p,i,true)).join("")}</div>
+        <div class="actions"><button class="secondary" id="add-product">+ הוספת אריזה / חוזק</button></div>
         <div class="actions"><button id="save">שמירה</button><button class="secondary" id="cancel">ביטול</button></div>
         <div id="form-error" class="muted"></div>
       </section>`;
-    this.querySelector("#cancel").onclick=()=>{this.querySelector("#editor").innerHTML="";if(this._refreshPending){this._refreshPending=false;this.load(true);}};
+    this.querySelector("#cancel").onclick=()=>{this._editorOpen=false;this.querySelector("#editor").innerHTML="";if(this._refreshPending){this._refreshPending=false;this.load(true);}};
     this.querySelector("#mode").onchange=()=>{const mode=this.querySelector("#mode").value;this.querySelector("#phases").style.display=mode==="phased"?"block":"none";this.querySelector("#fixed-dose").style.display=mode==="fixed"?"block":"none";this.querySelector("#fixed-times").style.display=mode==="fixed"?"block":"none";};
     this.querySelector("#add-product").onclick=()=>{const root=this.querySelector("#products");root.insertAdjacentHTML("beforeend",this.productEditor({id:crypto.randomUUID(),name:"",strength_mg:25,splittable:true,stock_batches:[]},root.children.length));};
     this.querySelector("#add-phase").onclick=()=>this.addPhase();
-    this.querySelector("#remove-phase").onclick=()=>{const root=this.querySelector("#phase-list");if(root.children.length>1){root.lastElementChild.remove();root.lastElementChild.querySelector(".phase-duration").value="";}else alert("נדרש לפחות שלב אחד.");};
+    this.querySelector("#remove-phase").onclick=()=>{const root=this.querySelector("#phase-list");if(root.children.length>1){root.lastElementChild.remove();root.lastElementChild.querySelector(".phase-end").value="";}else alert("נדרש לפחות שלב אחד.");};
     this.querySelector("#save").onclick=()=>this.saveMedication(med);
+    if(addStrength)this.querySelector("#add-product").click();
   }
   phaseEditor(phase,index) {
     const weekdays=phase.weekdays||[0,1,2,3,4,5,6];
-    const days=["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"];
+    const days=["ב׳","ג׳","ד׳","ה׳","ו׳","ש׳","א׳"];
+    const startDate=phase.start_date||this.todayLocal();
+    let endDate="";
+    if(phase.duration_days!=null){
+      const d=new Date(startDate+"T00:00:00");
+      d.setDate(d.getDate()+Number(phase.duration_days)-1);
+      const pad=n=>String(n).padStart(2,"0");
+      endDate=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+    }
     return `<div class="phase-row phase-editor" data-phase-index="${index}">
+      <div class="line"><strong>תקופה ${index+1}</strong><span class="muted">מינון לפי תאריכים</span></div>
       <div class="form">
-        <div><label>תאריך התחלה</label><input class="phase-start" type="date" value="${this.esc(phase.start_date||this.todayLocal())}"></div>
-        <div><label>משך השלב בימים (ריק = ללא הגבלה)</label><input class="phase-duration" type="number" min="1" step="1" value="${phase.duration_days??""}" placeholder="ללא הגבלה"></div>
-        <div><label>מינון במ״ג</label><input class="phase-dose" type="number" min="0.5" step="0.5" value="${phase.dose_mg||25}"></div>
-        <div><label>שעות (מופרדות בפסיק)</label><input class="phase-times" value="${this.esc((phase.times||["08:00"]).join(", "))}"></div>
-        <div class="wide"><label>ימי נטילה</label><select class="phase-weekdays" multiple size="2">${days.map((d,i)=>`<option value="${i}" ${weekdays.includes(i)?"selected":""}>${d}</option>`).join("")}</select></div>
+        <div><label>מתאריך</label><input class="phase-start" type="date" value="${this.esc(startDate)}"></div>
+        <div><label>עד תאריך (ריק = ממשיך ללא הגבלה)</label><input class="phase-end" type="date" value="${this.esc(endDate)}"></div>
+        <div><label>מינון בכל נטילה (מ״ג)</label><input class="phase-dose" type="number" min="0.5" step="0.5" value="${phase.dose_mg||25}"></div>
+        <div><label>שעות נטילה (פסיק בין שעות)</label><input class="phase-times" value="${this.esc((phase.times||["08:00"]).join(", "))}"></div>
+        <div class="wide"><label>באילו ימים לקחת?</label><select class="phase-weekdays" multiple size="2">${days.map((d,i)=>`<option value="${i}" ${weekdays.includes(i)?"selected":""}>${d}</option>`).join("")}</select></div>
       </div>
     </div>`;
   }
   addPhase() {
     const root=this.querySelector("#phase-list");
     const last=root.lastElementChild;
-    const duration=Number(last.querySelector(".phase-duration").value||30);
-    if(!Number.isInteger(duration)||duration<1)return alert("יש להזין משך שלב תקין לפני הוספת שלב נוסף.");
     const start=last.querySelector(".phase-start").value;
-    if(!start)return alert("יש להזין תאריך התחלה לשלב הנוכחי.");
-    const nextDate=new Date(start+"T00:00:00");
-    nextDate.setDate(nextDate.getDate()+duration);
+    const end=last.querySelector(".phase-end").value;
+    if(!start||!end)return alert("כדי להוסיף תקופה נוספת, יש לבחור תאריך התחלה ותאריך סיום לתקופה הנוכחית.");
+    const startDate=new Date(start+"T00:00:00");
+    const endDate=new Date(end+"T00:00:00");
+    if(Number.isNaN(startDate.getTime())||Number.isNaN(endDate.getTime())||endDate<startDate)
+      return alert("תאריך הסיום חייב להיות אחרי תאריך ההתחלה.");
+    const duration=Math.round((Date.UTC(endDate.getFullYear(),endDate.getMonth(),endDate.getDate())-Date.UTC(startDate.getFullYear(),startDate.getMonth(),startDate.getDate()))/86400000)+1;
+    const nextDate=new Date(endDate);
+    nextDate.setDate(nextDate.getDate()+1);
     const pad=n=>String(n).padStart(2,"0");
     const nextStart=nextDate.getFullYear()+"-"+pad(nextDate.getMonth()+1)+"-"+pad(nextDate.getDate());
-    last.querySelector(".phase-duration").value=duration;
     const selected=[...last.querySelector(".phase-weekdays").selectedOptions].map(o=>Number(o.value));
     const phase={
       start_date:nextStart,duration_days:null,
@@ -234,15 +302,16 @@ class PillManagerPanel extends HTMLElement {
       times:last.querySelector(".phase-times").value.split(",").map(x=>x.trim()).filter(Boolean),
       weekdays:selected.length?selected:[0,1,2,3,4,5,6]
     };
+    last.querySelector(".phase-end").value=end;
     root.insertAdjacentHTML("beforeend",this.phaseEditor(phase,root.children.length));
   }
-  productEditor(product,index) {
+  productEditor(product,index,isExisting=false) {
     return `<div class="product" data-product-index="${index}" data-id="${this.esc(product.id||crypto.randomUUID())}">
-      <div class="form"><div><label>שם / תיאור האריזה</label><input class="p-name" value="${this.esc(product.name||"")}" placeholder="למשל טבליות 25 מ״ג"></div>
-      <div><label>חוזק לטבליה (מ״ג)</label><input class="p-strength" type="number" min="0.5" step="0.5" value="${product.strength_mg||25}"></div>
-      <div><label>מלאי התחלתי (יחידות)</label><input class="p-quantity" type="number" min="0" step="${product.splittable?0.5:1}" value="${(product.stock_batches||[]).reduce((s,b)=>s+Number(b.quantity||0),0)}"></div>
+      <div class="form"><div><label>שם האריזה (למשל: 30 טבליות)</label><input class="p-name" value="${this.esc(product.name||"")}" placeholder="למשל טבליות 25 מ״ג"></div>
+      <div><label>חוזק של כל טבליה (מ״ג)</label><input class="p-strength" type="number" min="0.5" step="0.5" value="${product.strength_mg||25}"></div>
+      <div><label>${isExisting?"כמות קיימת (לשינוי השתמש בכפתור הוספת מלאי בכרטיס)":"כמות טבליות שיש לך"}</label><input class="p-quantity" type="number" min="0" step="${product.splittable?0.5:1}" value="${(product.stock_batches||[]).reduce((s,b)=>s+Number(b.quantity||0),0)}" ${isExisting?"readonly":""}></div>
       <div><label>אפשר לחצות?</label><select class="p-split"><option value="true" ${product.splittable?"selected":""}>כן, חצאים מותרים</option><option value="false" ${!product.splittable?"selected":""}>לא</option></select></div></div>
-      <div class="muted">מלאי התחלתי נשמר כאצווה חדשה בעת יצירת מוצר.</div></div>`;
+      <div class="muted">${isExisting?"המלאי הקיים מוצג לקריאה בלבד כדי לשמור על היסטוריית הנטילות. אפשר להוסיף מלאי מכרטיס התרופה.":"הכמות תתווסף למלאי של התרופה בחוזק הזה."}</div></div>`;
   }
   async saveMedication(original) {
     const error=this.querySelector("#form-error");
@@ -275,7 +344,7 @@ class PillManagerPanel extends HTMLElement {
         const rows=[...this.querySelectorAll(".phase-row")];
         const phases=rows.map(row=>({
           start_date:row.querySelector(".phase-start").value,
-          duration_days:row.querySelector(".phase-duration").value===""?null:Number(row.querySelector(".phase-duration").value),
+          duration_days:(()=>{const start=row.querySelector(".phase-start").value;const end=row.querySelector(".phase-end").value;if(!end)return null;const a=new Date(start+"T00:00:00"),b=new Date(end+"T00:00:00");return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/86400000)+1;})(),
           dose_mg:Number(row.querySelector(".phase-dose").value),
           times:row.querySelector(".phase-times").value.split(",").map(x=>x.trim()).filter(Boolean),
           weekdays:[...row.querySelector(".phase-weekdays").selectedOptions].map(o=>Number(o.value))
@@ -283,6 +352,7 @@ class PillManagerPanel extends HTMLElement {
         regimen={mode:"phased",phases};
       }
       await this.call("save_medication",{medication:{...original,name,products,regimen}});
+      this._editorOpen=false;
       this.querySelector("#editor").innerHTML="";
       this._refreshPending=false;
       await this.load(true);

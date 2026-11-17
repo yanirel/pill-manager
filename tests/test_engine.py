@@ -70,12 +70,26 @@ class EngineTests(unittest.TestCase):
         self.assertIsNone(ENGINE.active_phase(regimen, date(2026, 11, 17)))
         self.assertEqual(forecast([], regimen, date(2026, 11, 17))["reason"], "prn")
 
-    def test_phases_must_be_contiguous(self):
+    def test_treatment_periods_can_have_gaps(self):
         regimen = {"mode": "phased", "phases": [
             {"start_date": "2026-01-01", "duration_days": 2, "dose_mg": 25, "times": ["08:00"]},
+            {"start_date": "2026-01-10", "duration_days": 5, "dose_mg": 50, "times": ["08:00"]}]}
+        validate_regimen(regimen)
+        self.assertIsNone(ENGINE.active_phase(regimen, date(2026, 1, 5)))
+        self.assertEqual(ENGINE.active_phase(regimen, date(2026, 1, 12))["dose_mg"], 50)
+
+    def test_treatment_periods_cannot_overlap(self):
+        regimen = {"mode": "phased", "phases": [
+            {"start_date": "2026-01-01", "duration_days": 5, "dose_mg": 25, "times": ["08:00"]},
             {"start_date": "2026-01-04", "duration_days": None, "dose_mg": 50, "times": ["08:00"]}]}
         with self.assertRaises(PillManagerError):
             validate_regimen(regimen)
+
+    def test_final_treatment_period_can_have_an_end_date(self):
+        regimen = {"mode": "phased", "phases": [
+            {"start_date": "2026-01-01", "duration_days": 5, "dose_mg": 25, "times": ["08:00"]}]}
+        validate_regimen(regimen)
+        self.assertIsNone(ENGINE.active_phase(regimen, date(2026, 1, 6)))
 
     def test_batch_ids_are_scoped_to_product(self):
         products = [product("a", 25, 1, "2026-01-01", True, "same"),
