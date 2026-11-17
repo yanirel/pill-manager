@@ -10,3 +10,5 @@ WS_DELETE_MEDICATION = f"{DOMAIN}/delete_medication"
 WS_CONFIRM_INTAKE = f"{DOMAIN}/confirm_intake"
 WS_UPDATE_INTAKE = f"{DOMAIN}/update_intake"
 WS_SAVE_SCHEDULE = f"{DOMAIN}/save_schedule"
+
+EVENT_V2_UPDATED = f"{DOMAIN}_v2_updated"
