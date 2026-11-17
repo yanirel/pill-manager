@@ -111,6 +111,22 @@ async def async_setup_reminders(hass: HomeAssistant, entry, store):
                     occurrence["updated_at"] = now.isoformat()
                     changed = True
 
+                if options["auto_deduct_stock"] and not overdue:
+                    try:
+                        await hass.services.async_call(DOMAIN, "take_dose", {
+                            "medication_id": medication["id"],
+                            "intake_id": occurrence_id,
+                            "occurrence_id": occurrence_id,
+                            "actual_dose_mg": float(phase["dose_mg"]),
+                            "scheduled_dose_mg": float(phase["dose_mg"]),
+                            "taken_at": scheduled.isoformat(),
+                            "source": "scheduled_auto",
+                        })
+                        continue
+                    except Exception:
+                        # If stock cannot satisfy the planned dose, fall back to a reminder.
+                        pass
+
                 mark = next((x for x in store.data.setdefault("reminder_marks", [])
                              if x.get("occurrence_id") == occurrence_id), None)
                 last_sent = _parse(mark.get("last_sent")) if mark else None
