@@ -20,8 +20,8 @@
           "missed_after_minutes": "סימון כמנה שהוחמצה לאחר (דקות)",
           "missed_dose_action": "מה לעשות כשמנה מתעכבת",
           "auto_deduct_stock": "הפחתת מלאי אוטומטית לפי לוח הזמנים",
-          "notify_entity": "ישות התראות (התראה רגילה)",
-          "notify_service": "שירות mobile_app ישן (כולל כפתורי פעולה)"
+          "notify_entity": "ישות notify (מומלץ; ללא כפתורי פעולה)",
+          "notify_service": "שירות mobile_app ישן (כולל לקחתי / דחה / דלג)"
         }
       }
     }
