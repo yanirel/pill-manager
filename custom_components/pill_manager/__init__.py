@@ -14,6 +14,7 @@ from .storage_v2 import PillManagerStorage
 from .services import async_setup_services
 from .websocket import async_setup_websocket
 from .websocket_v2 import async_setup_v2_websocket
+from .notifications import async_setup_reminders
 
 PLATFORMS: list[str] = ["sensor", "binary_sensor"]
 
@@ -37,6 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await v2_store.async_load()
     hass.data.setdefault(f"{DOMAIN}_v2", {})[entry.entry_id] = v2_store
     await async_setup_services(hass)
+    await async_setup_reminders(hass, entry, v2_store)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     frontend_dir = Path(__file__).parent / "frontend"
