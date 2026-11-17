@@ -20,12 +20,24 @@ def product(pid, strength, qty, received, split=False, batch="b"):
 
 
 class EngineTests(unittest.TestCase):
-    def test_combines_strengths_for_target_mg(self):
-        products = [product("p25", 25, 4, "2026-01-01", True),
-                    product("p50", 50, 4, "2026-01-02", True)]
+    def test_combines_strengths_using_fewest_tablets(self):
+        # Even when 25 mg stock is older, prefer one 50 mg + one 25 mg
+        # tablet over three 25 mg tablets for a 75 mg dose.
+        products = [product("p25", 25, 30, "2026-01-01", False),
+                    product("p50", 50, 50, "2026-01-02", False)]
         allocation = allocate_dose(products, 75, date(2026, 2, 1))
+        self.assertEqual(allocation, [
+            {"product_id": "p25", "batch_id": "b", "units": 1.0},
+            {"product_id": "p50", "batch_id": "b", "units": 1.0},
+        ])
         actual = sum(next(p["strength_mg"] for p in products if p["id"] == x["product_id"]) * x["units"] for x in allocation)
         self.assertEqual(actual, 75)
+
+    def test_fifo_breaks_ties_after_minimizing_tablets(self):
+        products = [product("old", 25, 1, "2026-01-01", False),
+                    product("new", 25, 1, "2026-02-01", False)]
+        allocation = allocate_dose(products, 25, date(2026, 3, 1))
+        self.assertEqual(allocation, [{"product_id": "old", "batch_id": "b", "units": 1.0}])
 
     def test_half_tablet_supported(self):
         products = [product("p25", 25, 1, "2026-01-01", True)]
