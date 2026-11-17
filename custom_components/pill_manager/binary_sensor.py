@@ -1,12 +1,13 @@
 """Binary sensor indicating an unconfirmed scheduled dose."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.util import dt as dt_util
+from homeassistant.helpers.event import async_track_time_interval
 
 from .const import DOMAIN, EVENT_V2_UPDATED
 from .engine import active_phase
@@ -95,4 +96,5 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             entity.async_write_ha_state()
 
     unsub = hass.bus.async_listen(EVENT_V2_UPDATED, handle_update)
-    hass.data.setdefault(f"{DOMAIN}_unsubscribers", {}).setdefault(entry.entry_id, []).append(unsub)
+    interval_unsub = async_track_time_interval(hass, lambda _now: handle_update(None), timedelta(minutes=1))
+    hass.data.setdefault(f"{DOMAIN}_unsubscribers", {}).setdefault(entry.entry_id, []).extend([unsub, interval_unsub])
