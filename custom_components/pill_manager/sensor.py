@@ -19,7 +19,12 @@ def _get_forecast(store, medication):
     key = (medication["id"], today)
     if key not in cache:
         try:
-            cache[key] = forecast(medication.get("products", []), medication.get("regimen", {}), today)
+            cache[key] = forecast(
+                medication.get("products", []), medication.get("regimen", {}), today,
+                medication_id=medication["id"],
+                intake_records=store.data.get("intake", []),
+                occurrences=store.data.get("occurrences", []),
+            )
         except (PillManagerError, KeyError, ValueError) as err:
             cache[key] = {"error": str(err)}
         store._pill_manager_forecast_cache = cache
