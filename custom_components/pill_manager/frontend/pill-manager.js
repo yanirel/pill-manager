@@ -263,13 +263,19 @@ class PillManagerPanel extends HTMLElement {
   async takeMedication(medication) {
     if (!medication) return;
     const phase = medication.current_phase;
-    let dose = phase?.dose_mg;
-    if (medication.regimen?.mode === "prn") {
-      dose = Number(prompt("כמה מ״ג לקחת בפועל?"));
-    } else if (!phase) {
+    if (medication.regimen?.mode !== "prn" && !phase) {
       return alert("אין משטר מינון פעיל לתאריך הנוכחי.");
     }
-    if (!Number.isFinite(Number(dose)) || Number(dose) <= 0) return;
+    const plannedDose = phase?.dose_mg;
+    const entered = prompt(
+      phase ? "המינון המתוכנן הוא "+plannedDose+" מ״ג. אפשר לשנות כאן רק עבור הנטילה הזו; המשטר לא ישתנה." : "כמה מ״ג נלקחו בפועל?",
+      plannedDose == null ? "" : String(plannedDose)
+    );
+    if (entered === null) return;
+    const dose = Number(entered);
+    if (!Number.isFinite(dose) || dose <= 0 || Math.abs(dose*2-Math.round(dose*2))>1e-7) {
+      return alert("יש להזין מינון חיובי בכפולות של 0.5 מ״ג.");
+    }
     const now = new Date();
     const pad = value => String(value).padStart(2, "0");
     const dateKey = now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
