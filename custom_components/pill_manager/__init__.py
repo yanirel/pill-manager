@@ -15,7 +15,7 @@ from .services import async_setup_services
 from .websocket import async_setup_websocket
 from .websocket_v2 import async_setup_v2_websocket
 
-PLATFORMS: list[str] = []
+PLATFORMS: list[str] = ["sensor"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -37,6 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await v2_store.async_load()
     hass.data.setdefault(f"{DOMAIN}_v2", {})[entry.entry_id] = v2_store
     await async_setup_services(hass)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     frontend_dir = Path(__file__).parent / "frontend"
     await hass.http.async_register_static_paths([
@@ -59,6 +60,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload an instance."""
     from homeassistant.components import frontend
 
+    await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    for unsub in hass.data.get(f"{DOMAIN}_unsubscribers", {}).pop(entry.entry_id, []):
+        unsub()
     frontend.async_remove_panel(hass, "pill-manager")
     hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     v2_entries = hass.data.get(f"{DOMAIN}_v2", {})
