@@ -157,9 +157,16 @@ class PillManagerPanel extends HTMLElement {
     if (!Number.isFinite(Number(dose)) || Number(dose) <= 0) return;
     const now = new Date();
     const pad = value => String(value).padStart(2, "0");
-    const occurrence = "panel:" + medication.id + ":" +
-      now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate())+":"+
-      pad(now.getHours())+":"+pad(now.getMinutes());
+    const dateKey = now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+    const clock = pad(now.getHours())+":"+pad(now.getMinutes());
+    const dueTime = (phase?.times || []).filter(t => t <= clock).sort().reverse()
+      .find(t => {
+        const id = medication.id + ":" + dateKey + ":" + t;
+        return !(this.data?.intake || []).some(x => x.occurrence_id === id && x.status === "taken")
+          && !(this.data?.occurrences || []).some(x => x.occurrence_id === id && ["skipped","missed"].includes(x.status));
+      });
+    const occurrence = dueTime ? medication.id + ":" + dateKey + ":" + dueTime
+      : "panel:" + medication.id + ":" + dateKey + ":" + clock;
     try {
       await this._hass.callService("pill_manager", "take_dose", {
         medication_id: medication.id,
