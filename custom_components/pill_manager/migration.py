@@ -90,6 +90,8 @@ def import_legacy_data(legacy_data, v2_data):
             if abs(quantity - round(quantity)) > 1e-7:
                 warnings.append(f"{old.get('name', 'תרופה')}: מלאי לא שלם בחוזק {strength_text!r}; הכמות יובאה כאפס כדי לא להציג מלאי שגוי. יש לתקן ידנית.")
                 quantity = 0
+            elif quantity < 0:
+                warnings.append(f"{old.get('name', 'תרופה')}: נמצאה יתרת מלאי שלילית בחוזק {strength_text!r}; היא נשמרה לבדיקה.")
             product_id = uuid4().hex
             strength_map[strength_text] = strength
             products.append({
@@ -99,7 +101,7 @@ def import_legacy_data(legacy_data, v2_data):
                 "splittable": False,
                 "stock_batches": [{
                     "id": uuid4().hex,
-                    "quantity": max(0, quantity),
+                    "quantity": quantity,
                     "received_at": "1970-01-01",
                 }],
             })
